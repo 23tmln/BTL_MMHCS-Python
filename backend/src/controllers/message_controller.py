@@ -141,7 +141,7 @@ async def send_message(sender_id: str, receiver_id: str, text: str = None, image
 
 
 async def get_chat_partners(user_id: str):
-    """Get all users that the logged-in user has messages with"""
+    """Get all users that the logged-in user has messages with, sorted by last message date"""
     try:
         db = get_db()
         
@@ -156,18 +156,22 @@ async def get_chat_partners(user_id: str):
                 {"senderId": user_id_obj},
                 {"receiverId": user_id_obj}
             ]
-        }).to_list(None)
+        }).sort("createdAt", -1).to_list(None)
         
-        # Extract unique chat partner IDs
-        chat_partner_ids = set()
+        # Extract unique chat partner IDs with last message date
+        chat_partners_map = {}  # {partner_id: last_message_date}
         for msg in messages:
             if msg["senderId"] == user_id_obj:
-                chat_partner_ids.add(msg["receiverId"])
+                partner_id = msg["receiverId"]
             else:
-                chat_partner_ids.add(msg["senderId"])
+                partner_id = msg["senderId"]
+            
+            partner_id_str = str(partner_id)
+            if partner_id_str not in chat_partners_map:
+                chat_partners_map[partner_id_str] = msg.get("createdAt")
         
         # Convert to ObjectId list for query
-        chat_partner_ids_obj = [ObjectId(str(id)) for id in chat_partner_ids]
+        chat_partner_ids_obj = [ObjectId(partner_id) for partner_id in chat_partners_map.keys()]
         
         # Get chat partners, excluding password
         chat_partners = await db["users"].find(
@@ -175,12 +179,62 @@ async def get_chat_partners(user_id: str):
             {"password": 0}
         ).to_list(None)
         
-        # Convert ObjectIds to strings
+        # Convert ObjectIds to strings and add last message date
+        result = []
         for partner in chat_partners:
-            partner["_id"] = str(partner["_id"])
+            partner_id_str = str(partner["_id"])
+            partner["_id"] = partner_id_str
+            partner["lastMessageDate"] = chat_partners_map[partner_id_str]
+            result.append(partner)
         
-        return chat_partners, 200
+        # Sort by last message date (newest first)
+        result.sort(key=lambda x: x.get("lastMessageDate") or datetime.utcnow(), reverse=True)
+        
+        print(f"[Message] get_chat_partners for user {user_id}: found {len(result)} chat partners")
+        return result, 200
         
     except Exception as e:
         print(f"Error in get_chat_partners: {e}")
         return {"error": "Internal server error"}, 500
+
+
+async def get_chat_partner_ids(user_id: str):
+    """Get list of user IDs that have chat history with the logged-in user"""
+    try:
+        print(f"[Controller] get_chat_partner_ids called with user_id={user_id}")
+        db = get_db()
+        
+        if not ObjectId.is_valid(user_id):
+            print(f"[Controller] Invalid user ID: {user_id}")
+            return {"error": "Invalid user ID"}, 400
+        
+        user_id_obj = ObjectId(user_id)
+        print(f"[Controller] user_id_obj={user_id_obj}")
+        
+        # Find all messages where the user is sender or receiver
+        messages = await db["messages"].find({
+            "$or": [
+                {"senderId": user_id_obj},
+                {"receiverId": user_id_obj}
+            ]
+        }).to_list(None)
+        
+        print(f"[Controller] Found {len(messages)} messages")
+        
+        # Extract unique chat partner IDs
+        chat_partner_ids = set()
+        for msg in messages:
+            if msg["senderId"] == user_id_obj:
+                chat_partner_ids.add(str(msg["receiverId"]))
+            else:
+                chat_partner_ids.add(str(msg["senderId"]))
+        
+        result = sorted(list(chat_partner_ids))
+        print(f"[Controller] get_chat_partner_ids for user {user_id}: found {len(result)} chat partners: {result}")
+        return result, 200
+        
+    except Exception as e:
+        print(f"[Controller Error] get_chat_partner_ids failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Internal server error: {str(e)}"}, 500

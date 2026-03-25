@@ -35,10 +35,30 @@ export const useChatStore = create((set, get) => ({
   getMyChatPartners: async () => {
     set({ isUsersLoading: true });
     try {
-      const res = await axiosInstance.get("/messages/chats");
-      set({ chats: res.data });
+      // Get all contacts first
+      const contactsRes = await axiosInstance.get("/messages/contacts");
+      const allContacts = contactsRes.data;
+
+      // Get chat partner IDs (users we've messaged with)
+      const partnerIdsRes = await axiosInstance.get(
+        "/messages/chat-partner-ids",
+      );
+      const chatPartnerIds = partnerIdsRes.data;
+
+      // Filter contacts to only show users we've chatted with, sorted by name
+      const chatPartners = allContacts
+        .filter((contact) => chatPartnerIds.includes(contact._id))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+      console.log(
+        "[Chat] getMyChatPartners - found",
+        chatPartners.length,
+        "chat partners",
+      );
+      set({ chats: chatPartners });
     } catch (error) {
-      toast.error(error.response.data.message);
+      console.error("[Chat] getMyChatPartners error:", error);
+      toast.error(error.response?.data?.message || "Failed to load chats");
     } finally {
       set({ isUsersLoading: false });
     }
