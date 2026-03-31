@@ -7,6 +7,7 @@ from src.lib.utils import generate_token
 from src.lib.cloudinary import upload_image
 from src.emails.email_handlers import send_welcome_email
 from src.lib.config import config
+from src.lib.crypto_client import generate_keys_for_user
 from src.models.User import UserCreate, UserLogin, UserUpdate
 
 
@@ -51,6 +52,13 @@ async def signup(email: str, fullName: str, password: str):
         if result.inserted_id:
             # Generate token
             token = generate_token(str(result.inserted_id))
+            
+            # Generate encryption keys for the user
+            try:
+                await generate_keys_for_user(str(result.inserted_id))
+            except Exception as e:
+                print(f"Failed to generate keys for user {result.inserted_id}: {e}")
+                # Don't fail signup if key generation fails
             
             # Try to send welcome email
             try:

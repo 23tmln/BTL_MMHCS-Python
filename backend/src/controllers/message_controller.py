@@ -3,6 +3,7 @@ from datetime import datetime
 from src.lib.db import get_db
 from src.lib.cloudinary import upload_image
 from src.lib.socket import get_receiver_socket_id, emit_new_message, emit_online_users
+from src.lib.crypto_client import generate_keys_for_user, get_public_bundle, encrypt_message, decrypt_message
 
 
 async def get_all_contacts(user_id: str):
@@ -50,16 +51,53 @@ async def get_messages_by_user_id(my_id: str, user_to_chat_id: str):
             ]
         }).to_list(None)
         
-        # Convert ObjectIds to strings
+        # Convert ObjectIds to strings and decrypt messages
         for message in messages:
             message["_id"] = str(message["_id"])
             message["senderId"] = str(message["senderId"])
             message["receiverId"] = str(message["receiverId"])
+
+            # Use cached plaintext if already decrypted in DB
+            if message.get("decryptedText"):
+                message["text"] = message["decryptedText"]
+                continue
+
+            # Decrypt ciphertext if present
+            if message.get("ciphertext") and message.get("messageType") and message.get("sessionId"):
+                try:
+                    decrypt_result = await decrypt_message(
+                        message["senderId"],
+                        message["receiverId"],
+                        message["ciphertext"],
+                        message["messageType"],
+                        message["sessionId"]
+                    )
+                    message["text"] = decrypt_result["plaintext"]
+
+                    if message["text"] == "[Message already decrypted; using cached value]":
+                        # Try to read again in case another concurrent request just saved it
+                        fresh_msg = await db["messages"].find_one({"_id": ObjectId(message["_id"])})
+                        if fresh_msg and fresh_msg.get("decryptedText"):
+                            message["text"] = fresh_msg["decryptedText"]
+                    else:
+                        # persist the successful plaintext so repeated query does not trigger libsignal one-time-key races
+                        try:
+                            await db["messages"].update_one(
+                                {"_id": ObjectId(message["_id"])},
+                                {"$set": {"decryptedText": message["text"]}}
+                            )
+                        except Exception as upderr:
+                            print(f"Warning: could not persist decryptedText for {message['_id']}: {upderr}")
+
+                except Exception as e:
+                    print(f"Error decrypting message {message['_id']}: {e}")
+                    message["text"] = "[Decryption failed]"
+            else:
+                message["text"] = message.get("ciphertext", "")  # Fallback
+            
             # Convert datetime objects to ISO strings
             if isinstance(message.get("createdAt"), datetime):
                 message["createdAt"] = message["createdAt"].isoformat()
-            if isinstance(message.get("updatedAt"), datetime):
-                message["updatedAt"] = message["updatedAt"].isoformat()
         
         return messages, 200
         
@@ -103,29 +141,47 @@ async def send_message(sender_id: str, receiver_id: str, text: str = None, image
                 print(f"Error uploading image: {e}")
                 return {"error": "Failed to upload image"}, 500
         
-        # Create new message
+        # Encrypt text using crypto service
+        encrypt_result = None
+        if text:
+            try:
+                # Get receiver's public bundle
+                bundle_response = await get_public_bundle(receiver_id)
+                if not bundle_response:
+                    return {"error": "Receiver has no encryption keys. Please ask them to refresh."}, 400
+
+                recipient_bundle = bundle_response["bundle"]
+
+                # Encrypt message
+                encrypt_result = await encrypt_message(sender_id, receiver_id, text, recipient_bundle)
+
+            except Exception as e:
+                print(f"Error encrypting message: {e}")
+                return {"error": "Failed to encrypt message"}, 500
+        
+        # Create new message with encrypted data
         now = datetime.now()
         new_message = {
             "senderId": sender_id_obj,
             "receiverId": receiver_id_obj,
-            "text": text,
+            "ciphertext": encrypt_result["ciphertext"] if encrypt_result else None,
+            "messageType": encrypt_result["messageType"] if encrypt_result else None,
+            "sessionId": encrypt_result["sessionId"] if encrypt_result else None,
             "image": image_url,
-            "createdAt": now,
-            "updatedAt": now
+            "createdAt": now
         }
         
         result = await db["messages"].insert_one(new_message)
         
         if result.inserted_id:
-            # Convert for response (datetime to ISO string for JSON serialization)
+            # Convert for response (return plaintext to sender)
             response_message = {
                 "_id": str(result.inserted_id),
                 "senderId": str(sender_id_obj),
                 "receiverId": str(receiver_id_obj),
-                "text": text,
+                "text": text,  # Return original plaintext to sender
                 "image": image_url,
-                "createdAt": now.isoformat(),
-                "updatedAt": now.isoformat()
+                "createdAt": now.isoformat()
             }
             
             # Emit message to receiver in real-time if they're connected

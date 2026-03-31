@@ -2,6 +2,7 @@ import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import axios from "axios";
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -27,7 +28,29 @@ export const getMessagesByUserId = async (req, res) => {
       ],
     });
 
-    res.status(200).json(messages);
+    const decryptedMessages = await Promise.all(
+      messages.map(async (msg) => {
+        const msgObj = msg.toObject();
+        if (msgObj.isEncrypted) {
+          try {
+            const decryptRes = await axios.post(`${process.env.CRYPTO_SERVICE_URL}/decrypt`, {
+              from: msgObj.senderId.toString(),
+              to: msgObj.receiverId.toString(),
+              ciphertext: msgObj.ciphertext,
+              messageType: msgObj.messageType,
+              sessionId: msgObj.sessionId,
+            });
+            msgObj.text = decryptRes.data.plaintext;
+          } catch (error) {
+            console.error("Decryption error:", error.message);
+            msgObj.text = "[Cannot decrypt]";
+          }
+        }
+        return msgObj;
+      })
+    );
+
+    res.status(200).json(decryptedMessages);
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -58,21 +81,73 @@ export const sendMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
-    const newMessage = new Message({
+    let isEncrypted = false;
+    let cryptoData = {};
+
+    if (text) {
+      let recipientBundle;
+      try {
+        const bundleRes = await axios.get(`${process.env.CRYPTO_SERVICE_URL}/bundle/${receiverId}`);
+        recipientBundle = bundleRes.data;
+      } catch (error) {
+        await axios.post(`${process.env.CRYPTO_SERVICE_URL}/generate-keys`, { userId: receiverId });
+        const bundleRes = await axios.get(`${process.env.CRYPTO_SERVICE_URL}/bundle/${receiverId}`);
+        recipientBundle = bundleRes.data;
+      }
+
+      try {
+        await axios.get(`${process.env.CRYPTO_SERVICE_URL}/bundle/${senderId}`);
+      } catch (error) {
+        await axios.post(`${process.env.CRYPTO_SERVICE_URL}/generate-keys`, { userId: senderId });
+      }
+
+      const encryptRes = await axios.post(`${process.env.CRYPTO_SERVICE_URL}/encrypt`, {
+        from: senderId.toString(),
+        to: receiverId.toString(),
+        plaintext: text,
+        recipientBundle,
+      });
+
+      cryptoData = {
+        ciphertext: encryptRes.data.ciphertext,
+        messageType: encryptRes.data.messageType,
+        sessionId: encryptRes.data.sessionId,
+      };
+      isEncrypted = true;
+    }
+
+    const newMessageData = {
       senderId,
       receiverId,
-      text,
       image: imageUrl,
-    });
+    };
 
+    if (isEncrypted) {
+      newMessageData.isEncrypted = true;
+      newMessageData.ciphertext = cryptoData.ciphertext;
+      newMessageData.messageType = cryptoData.messageType;
+      newMessageData.sessionId = cryptoData.sessionId;
+    } else {
+      newMessageData.text = text;
+    }
+
+    const newMessage = new Message(newMessageData);
     await newMessage.save();
+
+    const messageForSocket = newMessage.toObject();
+    if (isEncrypted) {
+      messageForSocket.text = text;
+      delete messageForSocket.ciphertext;
+      delete messageForSocket.messageType;
+      delete messageForSocket.sessionId;
+    }
 
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+      io.to(receiverSocketId).emit("newMessage", messageForSocket);
     }
 
-    res.status(201).json(newMessage);
+    res.status(201).json(messageForSocket);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });

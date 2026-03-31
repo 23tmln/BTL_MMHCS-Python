@@ -78,6 +78,7 @@ function SignUpPage() {
                     </div>
                   </div>
 
+
                   {/* SUBMIT BUTTON */}
                   <button className="auth-btn" type="submit" disabled={isSigningUp}>
                     {isSigningUp ? (

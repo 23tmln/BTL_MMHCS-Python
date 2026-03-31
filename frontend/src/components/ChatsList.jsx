@@ -6,11 +6,12 @@ import { useAuthStore } from "../store/useAuthStore";
 
 function ChatsList() {
   const { getMyChatPartners, chats, isUsersLoading, setSelectedUser } = useChatStore();
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers, isSecureStorageConfigured, isSecureStorageRestored } = useAuthStore();
 
   useEffect(() => {
+    if (!isSecureStorageRestored && isSecureStorageConfigured !== false) return;
     getMyChatPartners();
-  }, [getMyChatPartners]);
+  }, [getMyChatPartners, isSecureStorageConfigured, isSecureStorageRestored]);
 
   if (isUsersLoading) return <UsersLoadingSkeleton />;
   if (chats.length === 0) return <NoChatsFound />;

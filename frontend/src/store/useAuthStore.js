@@ -23,11 +23,19 @@ export const useAuthStore = create((set, get) => ({
   socket: null,
   onlineUsers: [],
 
+  isSecureStorageConfigured: null,
+  isCheckingSecureStorage: false,
+  isSecureStorageRestored: false,
+  secureStorageError: null,
+  isSecureStorageBusy: false,
+  sessionPin: null, // PIN kept in memory for auto-backup after sending messages
+
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get("/auth/check");
       set({ authUser: res.data });
       get().connectSocket();
+      await get().checkSecureStorage();
     } catch (error) {
       console.log("Error in authCheck:", error);
       set({ authUser: null });
@@ -36,16 +44,73 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  checkSecureStorage: async () => {
+    set({ isCheckingSecureStorage: true, secureStorageError: null });
+    try {
+      const res = await axiosInstance.get("/secure-storage/status");
+      set({
+        isSecureStorageConfigured: res.data?.configured || false,
+        isSecureStorageRestored: false,
+      });
+    } catch (error) {
+      const message = error?.response?.data?.message || "Failed to read secure storage status";
+      set({ secureStorageError: message });
+    } finally {
+      set({ isCheckingSecureStorage: false });
+    }
+  },
+
+  setupSecureStorage: async (pin) => {
+    set({ isSecureStorageBusy: true, secureStorageError: null });
+    try {
+      const res = await axiosInstance.post("/secure-storage/setup", { pin });
+      set({ isSecureStorageConfigured: true, isSecureStorageRestored: true, sessionPin: pin });
+      toast.success(res.data?.message || "Secure storage configured");
+      return true;
+    } catch (error) {
+      const message = error?.response?.data?.detail || error?.response?.data?.error || "Failed to setup secure storage";
+      toast.error(message);
+      set({ secureStorageError: message });
+      return false;
+    } finally {
+      set({ isSecureStorageBusy: false });
+    }
+  },
+
+  restoreSecureStorage: async (pin) => {
+    set({ isSecureStorageBusy: true, secureStorageError: null });
+    try {
+      const res = await axiosInstance.post("/secure-storage/restore", { pin });
+      set({ isSecureStorageRestored: true, sessionPin: pin });
+      toast.success(res.data?.message || "Secure storage restored");
+      return true;
+    } catch (error) {
+      const message = error?.response?.data?.detail || error?.response?.data?.error || "Failed to restore secure storage";
+      toast.error(message);
+      set({ secureStorageError: message });
+      return false;
+    } finally {
+      set({ isSecureStorageBusy: false });
+    }
+  },
+
   signup: async (data) => {
     set({ isSigningUp: true });
     try {
-      const res = await axiosInstance.post("/auth/signup", data);
+      const res = await axiosInstance.post("/auth/signup", {
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
+      });
       set({ authUser: res.data });
 
       toast.success("Account created successfully!");
       get().connectSocket();
+
+      // After signup, secure storage flow is handled in ChatPage modal after login check.
+      await get().checkSecureStorage();
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Signup failed");
     } finally {
       set({ isSigningUp: false });
     }
@@ -60,8 +125,9 @@ export const useAuthStore = create((set, get) => ({
       toast.success("Logged in successfully");
 
       get().connectSocket();
+      await get().checkSecureStorage();
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Login failed");
     } finally {
       set({ isLoggingIn: false });
     }
@@ -70,9 +136,24 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await axiosInstance.post("/auth/logout");
-      set({ authUser: null });
+      set({
+        authUser: null,
+        // Reset all secure storage state so PIN modal shows on next login
+        isSecureStorageConfigured: null,
+        isSecureStorageRestored: false,
+        secureStorageError: null,
+        sessionPin: null,
+      });
       toast.success("Logged out successfully");
       get().disconnectSocket();
+
+      // Clear chat store state when logged out so we don't bleed previous chat context on the UI
+      try {
+        const { useChatStore } = await import("./useChatStore");
+        useChatStore.getState().clearChat();
+      } catch (err) {
+        console.warn("Could not clear chat store", err);
+      }
     } catch (error) {
       toast.error("Error logging out");
       console.log("Logout error:", error);

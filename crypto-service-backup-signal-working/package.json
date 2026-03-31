@@ -1,0 +1,32 @@
+{
+  "name": "crypto-service",
+  "version": "1.0.0",
+  "description": "Signal-based crypto microservice for chat project",
+  "main": "dist/server.js",
+  "scripts": {
+  "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+  "build": "tsc",
+  "start": "node dist/server.js",
+  "demo": "ts-node-dev --transpile-only src/demo.ts",
+  "signal:test": "ts-node-dev --transpile-only src/testSignal.ts",
+  "signal:methods": "ts-node-dev --transpile-only src/testSignalMethods.ts",
+  "keys:test": "ts-node-dev --transpile-only src/testRealKeys.ts",
+  "signal:stores": "ts-node-dev --transpile-only src/testSignalStores.ts",
+  "signal:pq": "ts-node-dev --transpile-only src/testSignalPQ.ts",
+  "signal:kem": "ts-node-dev --transpile-only src/testSignalKEM.ts",
+  "bundle:test": "ts-node-dev --transpile-only src/testBundle.ts"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@signalapp/libsignal-client": "^0.88.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.4.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}

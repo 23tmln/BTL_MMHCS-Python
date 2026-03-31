@@ -21,18 +21,30 @@ export const useChatStore = create((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   setSelectedUser: (selectedUser) => set({ selectedUser }),
 
+  clearChat: () => set({ messages: [], chats: [], allContacts: [], selectedUser: null }),
+
   getAllContacts: async () => {
+    const { isSecureStorageRestored } = useAuthStore.getState();
+    if (!isSecureStorageRestored) {
+      return;
+    }
+
     set({ isUsersLoading: true });
     try {
       const res = await axiosInstance.get("/messages/contacts");
       set({ allContacts: res.data });
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to load contacts");
     } finally {
       set({ isUsersLoading: false });
     }
   },
   getMyChatPartners: async () => {
+    const { isSecureStorageRestored } = useAuthStore.getState();
+    if (!isSecureStorageRestored) {
+      return;
+    }
+
     set({ isUsersLoading: true });
     try {
       // Get all contacts first
@@ -65,6 +77,11 @@ export const useChatStore = create((set, get) => ({
   },
 
   getMessagesByUserId: async (userId) => {
+    const { isSecureStorageRestored } = useAuthStore.getState();
+    if (!isSecureStorageRestored) {
+      return;
+    }
+
     set({ isMessagesLoading: true });
     try {
       const res = await axiosInstance.get(`/messages/${userId}`);
@@ -107,6 +124,14 @@ export const useChatStore = create((set, get) => ({
       const currentMessages = get().messages;
       const withoutOptimistic = currentMessages.filter((m) => m._id !== tempId);
       set({ messages: [...withoutOptimistic, res.data] });
+
+      // Auto-backup crypto state after sending so next login can decrypt new messages
+      const { sessionPin } = useAuthStore.getState();
+      if (sessionPin) {
+        axiosInstance.post("/secure-storage/backup", { pin: sessionPin }).catch((e) => {
+          console.warn("[Chat] Auto-backup after send failed:", e);
+        });
+      }
     } catch (error) {
       console.error("[Chat] Error sending message:", error);
       // remove optimistic message on failure

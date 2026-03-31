@@ -20,6 +20,19 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    ciphertext: {
+      type: String,
+    },
+    messageType: {
+      type: Number,
+    },
+    sessionId: {
+      type: String,
+    },
+    isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
