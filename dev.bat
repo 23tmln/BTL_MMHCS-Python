@@ -56,13 +56,25 @@ REM Start frontend
 echo 🎨 Starting Frontend (React) on port 5173...
 start "Chatify Frontend" cmd /k "cd frontend && npm install && npm run dev"
 
+REM Auto-detect LAN IP using PowerShell
+for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } | Sort-Object InterfaceMetric | Select-Object -First 1).IPAddress"') do set LAN_IP=%%i
+
 echo.
 echo ════════════════════════════════════════
 echo ✨ Chatify is now running! ✨
 echo ════════════════════════════════════════
 echo.
-echo Backend:  http://localhost:3000  (LAN: http://172.17.41.222:3000)
-echo Frontend: http://localhost:5173  (LAN: http://172.17.41.222:5173)
+echo [Localhost]
+echo   Backend:  http://localhost:3000
+echo   Frontend: http://localhost:5173
+echo.
+if defined LAN_IP (
+    echo [LAN - chia se voi may khac]
+    echo   Frontend: http://%LAN_IP%:5173
+    echo   Backend:  http://%LAN_IP%:3000
+) else (
+    echo [LAN] Khong phat hien duoc IP LAN
+)
 echo.
 echo Services are running in separate windows.
 echo Close the windows to stop the services.
