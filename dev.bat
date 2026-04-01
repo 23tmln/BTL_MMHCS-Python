@@ -47,7 +47,7 @@ echo.
 
 REM Start backend
 echo 📦 Starting Backend (FastAPI) on port 3000...
-start "Chatify Backend" cmd /k "cd backend && uv sync && uv run uvicorn src.server:app --reload --port 3000"
+start "Chatify Backend" cmd /k "cd backend && uv sync && uv run uvicorn src.server:app --host 0.0.0.0 --reload --port 3000"
 
 REM Give backend time to start
 timeout /t 3 /nobreak
@@ -61,8 +61,8 @@ echo ═════════════════════════
 echo ✨ Chatify is now running! ✨
 echo ════════════════════════════════════════
 echo.
-echo Backend:  http://localhost:3000
-echo Frontend: http://localhost:5173
+echo Backend:  http://localhost:3000  (LAN: http://172.17.41.222:3000)
+echo Frontend: http://localhost:5173  (LAN: http://172.17.41.222:5173)
 echo.
 echo Services are running in separate windows.
 echo Close the windows to stop the services.
