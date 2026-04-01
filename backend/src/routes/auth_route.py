@@ -21,9 +21,16 @@ async def signup_route(request: Request, response: Response):
         fullName = data.get("fullName")
         password = data.get("password")
         
-        result, status_code, token = await signup(email, fullName, password)
+        result = await signup(email, fullName, password)
         
-        if status_code == 201:
+        # Controller returns (data, status) on error, (data, status, token) on success
+        if len(result) == 3:
+            data, status_code, token = result
+        else:
+            data, status_code = result
+            token = None
+        
+        if status_code == 201 and token:
             # Set JWT cookie
             response.set_cookie(
                 key="jwt",
@@ -35,7 +42,7 @@ async def signup_route(request: Request, response: Response):
             )
         
         response.status_code = status_code
-        return result
+        return data
         
     except Exception as e:
         print(f"Error in signup route: {e}")
@@ -53,9 +60,16 @@ async def login_route(request: Request, response: Response):
         email = data.get("email")
         password = data.get("password")
         
-        result, status_code, token = await login(email, password)
+        result = await login(email, password)
         
-        if status_code == 200:
+        # Controller returns (data, status) on error, (data, status, token) on success
+        if len(result) == 3:
+            data, status_code, token = result
+        else:
+            data, status_code = result
+            token = None
+        
+        if status_code == 200 and token:
             # Set JWT cookie
             response.set_cookie(
                 key="jwt",
@@ -67,7 +81,7 @@ async def login_route(request: Request, response: Response):
             )
         
         response.status_code = status_code
-        return result
+        return data
         
     except Exception as e:
         print(f"Error in login route: {e}")
@@ -146,3 +160,24 @@ async def check_auth_route(user=Depends(protect_route)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+
+
+@router.get("/fido-callback")
+async def fido_callback_route(token: str, response: Response):
+    """Callback from FIDO desktop app — sets JWT cookie and redirects to frontend."""
+    from fastapi.responses import RedirectResponse
+    from src.lib.config import config
+    
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is missing")
+    
+    redirect_res = RedirectResponse(url=f"{config.CLIENT_URL}/", status_code=302)
+    redirect_res.set_cookie(
+        key="jwt",
+        value=token,
+        max_age=7 * 24 * 60 * 60,
+        httponly=True,
+        samesite="strict",
+        secure=False
+    )
+    return redirect_res
