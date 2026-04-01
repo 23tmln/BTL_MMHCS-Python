@@ -163,15 +163,30 @@ async def check_auth_route(user=Depends(protect_route)):
 
 
 @router.get("/fido-callback")
-async def fido_callback_route(token: str, response: Response):
-    """Callback from FIDO desktop app — sets JWT cookie and redirects to frontend."""
+async def fido_callback_route(token: str, request: Request, response: Response):
+    """Callback from FIDO desktop app — sets JWT cookie and redirects to frontend.
+    Auto-detects the frontend URL from the request Host header so it works
+    on any IP (localhost, LAN IP, etc.) without hardcoding.
+    """
     from fastapi.responses import RedirectResponse
     from src.lib.config import config
-    
+
     if not token:
         raise HTTPException(status_code=400, detail="Token is missing")
-    
-    redirect_res = RedirectResponse(url=f"{config.CLIENT_URL}/", status_code=302)
+
+    # Try to build frontend URL from the request's Host header
+    # This way it works with any IP (localhost, 172.17.x.x, etc.)
+    host = request.headers.get("host", "")  # e.g. "172.17.41.222:3000"
+    if host:
+        # Replace backend port (3000) with frontend port (5173)
+        frontend_host = host.replace(":3000", ":5173")
+        scheme = request.url.scheme  # "http" or "https"
+        frontend_url = f"{scheme}://{frontend_host}/"
+    else:
+        # Fallback to configured CLIENT_URL
+        frontend_url = f"{config.CLIENT_URL}/"
+
+    redirect_res = RedirectResponse(url=frontend_url, status_code=302)
     redirect_res.set_cookie(
         key="jwt",
         value=token,
