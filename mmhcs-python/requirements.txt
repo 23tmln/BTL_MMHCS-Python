@@ -1,0 +1,12 @@
+pyqt6-tools
+pyotp==2.9.0
+webauthn==1.11.1
+cryptography
+cbor2
+qrcode
+pillow
+fido2
+PyJWT>=2.6.0
+python-dotenv>=1.0.0
+pymongo>=4.5.0
+requests>=2.31.0
