@@ -1,3 +1,0 @@
-CATCH: page.goto: net::ERR_ABORTED at http://10.10.19.1:5173/
-Call log:
-[2m  - navigating to "http://10.10.19.1:5173/", waiting until "domcontentloaded"[22m

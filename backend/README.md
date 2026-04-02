@@ -1,135 +1,65 @@
-# Python backend (FastAPI + async/await with Motor for async MongoDB)
+# 🛡️ Backend - Máy chủ Trò chuyện Bảo mật E2EE (FastAPI)
 
-## Setup
+Đây là máy chủ trung tâm (backend) phục vụ cho dự án Trò chuyện Bảo mật đa nền tảng. Hệ thống được viết bằng ngôn ngữ Python với framework FastAPI và cơ sở dữ liệu MongoDB nhằm đáp ứng hiệu năng cực cao và kiến trúc hoàn toàn bất đồng bộ (Async/Await).
 
-### Prerequisites
+Backend không giữ bất cứ khóa mã hóa để giải mã nội dung của người dùng. Hệ thống chỉ thực hiện chức năng trung chuyển gói tin E2EE, nhận diện Passkey và phân tán Public Keys để cho phép hệ thống làm việc trong mạng phân tán.
 
-- Python 3.9+
-- MongoDB
-- uv package manager
+## 🌟 Các tính năng chính
 
-### Installation
+- **Xác thực Passkeys (WebAuthn/FIDO2)**: Xử lý và kiểm tra danh tính thông qua các khóa sinh trắc học và quản lý Challenge/Relying Party (RP) cho kết nối nội bộ hoặc LAN.
+- **Phân phối khóa E2EE**: Lưu trữ và cung cấp *Public Identity Key*, *Signed PreKey*, và *One-Time PreKeys* của người dùng, đóng vai trò như điểm trung gian thiết lập kết nối mã hóa trực tiếp (Signal Protocol).
+- **Phục hồi & Sao lưu khóa**: Lưu trữ các file keys sao lưu đã được cấp mã hóa tại cơ sở dữ liệu nhằm giữ tính linh hoạt và ổn định khi người dùng thay đổi thiết bị hay tải nạp lại ứng dụng, chống mất Key phiên.
+- **WebSocket Real-time**: Sử dụng engine python-socketio để trực tiếp trung chuyển tin nhắn mã hóa và cập nhật trạng thái thiết bị của người dùng (Online/Offline) trên mạng LAN.
 
-1. Navigate to the backend directory:
+## 🛠️ Công nghệ cốt lõi
 
-```bash
-cd backend
-```
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) chạy trên Python 3.9+
+- **Cơ sở dữ liệu**: MongoDB qua driver `motor` thực hiện truy xuất bất đồng bộ.
+- **Giao thức mạng**: python-socketio (cho hệ thống WebSocket)
+- **Quản lý Package**: Package manager thế hệ mới `uv`.
 
-2. Create a virtual environment using uv:
+## 🚀 Hướng dẫn cài đặt và sử dụng
 
-```bash
-uv venv
-```
+### Yêu cầu tiên quyết
+- Python >= 3.9
+- MongoDB (Sử dụng Compass hoặc Server chạy tự do, cung cấp MongoDB URI)
+- Có sẵn trình quản lý `uv`.
 
-3. Activate the virtual environment:
+### Các bước cài đặt
 
-```bash
-# On Windows
-.\.venv\Scripts\activate
+1. Di chuyển vào thư mục backend:
+   ```bash
+   cd backend
+   ```
 
-# On macOS/Linux
-source .venv/bin/activate
-```
+2. Tạo và kích hoạt môi trường ảo sử dụng uv:
+   ```bash
+   uv venv
+   
+   # Kích hoạt trên nền Windows:
+   .\.venv\Scripts\activate
+   
+   # Kích hoạt trên macOS/Linux:
+   source .venv/bin/activate
+   ```
 
-4. Install dependencies:
+3. Cài đặt các thư viện cần thiết:
+   ```bash
+   uv pip install -r requirements.txt
+   ```
 
-```bash
-uv pip install -r requirements.txt
-# or
-uv sync
-```
+4. Cấu hình các biến môi trường:
+   Tạo tệp `.env` định dạng từ `.env.example` và tùy chỉnh để phù hợp với đường truyền của bạn (Ví dụ: Chỉnh `MONGO_URI`, `CLIENT_URL` sao cho khớp với IP trong hệ thống LAN).
+   ```bash
+   cp .env.example .env
+   ```
 
-5. Configure environment variables:
+5. Khởi động server (Uvicorn HTTP Server):
+   ```bash
+   # Môi trường Development (Host 0.0.0.0 sẽ cho phép thiết bị khác trong mạng LAN có quyền kết nối)
+   uv run uvicorn src.server:app --reload --host 0.0.0.0 --port 3000
+   ```
 
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-6. Run the server:
-
-```bash
-# Development
-uv run uvicorn src.server:app --reload --host 0.0.0.0 --port 3000
-
-# Production
-uv run uvicorn src.server:app --host 0.0.0.0 --port 3000
-```
-
-## Project Structure
-
-```
-src/
-├── server.py           # FastAPI application entry point
-├── models/             # Pydantic models (User, Message)
-├── controllers/        # Business logic handlers
-├── routes/             # API route handlers
-├── middleware/         # Authentication and other middleware
-├── lib/                # Utility functions (DB, JWT, etc.)
-└── emails/             # Email templates and handlers
-```
-
-## API Endpoints
-
-### Authentication
-
-- `POST /api/auth/signup` - Register a new user
-- `POST /api/auth/login` - Login user
-- `POST /api/auth/logout` - Logout user
-- `PUT /api/auth/update-profile` - Update user profile
-- `GET /api/auth/check` - Check authentication status
-
-### Messages
-
-- `GET /api/messages/contacts` - Get all users
-- `GET /api/messages/{id}` - Get messages with a specific user
-- `POST /api/messages/send/{id}` - Send a message
-- `GET /api/messages/chat-partners` - Get chat partners
-
-## Real-time Features
-
-The application uses Socket.IO for real-time messaging:
-
-- User connection/disconnection status
-- Real-time message delivery
-- Online users list broadcasting
-
-## Environment Variables
-
-See `.env` file for required configuration:
-
-- `MONGO_URI` - MongoDB connection string
-- `JWT_SECRET` - JWT signing secret
-- `CLIENT_URL` - Frontend URL for CORS
-- `CLOUDINARY_*` - Cloudinary configuration
-- `RESEND_API_KEY` - Resend email service API key
-- `ARCJET_KEY` - Arcjet rate limiting service key
-
-## Development
-
-### Running Tests
-
-```bash
-uv run pytest tests/
-```
-
-### Linting
-
-```bash
-uv run flake8 src/
-```
-
-### Type Checking
-
-```bash
-uv run mypy src/
-```
-
-## Notes
-
-- This is a Python/FastAPI port of the original Node.js/Express backend
-- Uses Motor for async MongoDB operations
-- JWT tokens are stored in httpOnly cookies
-- Socket.IO is configured for async HTTP server (aiohttp)
-- CORS is configured to allow requests from the frontend URL
+## 🔐 Chi tiết Route phân cấp cơ bản
+* `/api/auth`: Điều phối toàn bộ hoạt động cấp đăng ký, đăng nhập và xác minh bằng Passkeys theo định dạng giao tiếp FIDO2 bảo mật nghiêm ngặt bằng cookie.
+* `/api/messages`: Thực hiện các endpoint gọi API liên quan tới gửi/nhận PreKey Bundle và giao tiếp gói tin Signal mã hóa.
