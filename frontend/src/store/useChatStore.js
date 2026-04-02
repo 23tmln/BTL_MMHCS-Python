@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
+import { encryptWithSignal, decryptWithSignal } from "../lib/signalHelper";
+import { getCachedMessage, cacheMessage } from "../lib/secureStore";
 
 export const useChatStore = create((set, get) => ({
   allContacts: [],
@@ -24,70 +26,113 @@ export const useChatStore = create((set, get) => ({
   clearChat: () => set({ messages: [], chats: [], allContacts: [], selectedUser: null }),
 
   getAllContacts: async () => {
-    const { isSecureStorageRestored } = useAuthStore.getState();
-    if (!isSecureStorageRestored) {
-      return;
-    }
-
     set({ isUsersLoading: true });
     try {
       const res = await axiosInstance.get("/messages/contacts");
       set({ allContacts: res.data });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to load contacts");
+      toast.error("Failed to load contacts");
     } finally {
       set({ isUsersLoading: false });
     }
   },
-  getMyChatPartners: async () => {
-    const { isSecureStorageRestored } = useAuthStore.getState();
-    if (!isSecureStorageRestored) {
-      return;
-    }
 
+  getMyChatPartners: async () => {
     set({ isUsersLoading: true });
     try {
-      // Get all contacts first
       const contactsRes = await axiosInstance.get("/messages/contacts");
       const allContacts = contactsRes.data;
 
-      // Get chat partner IDs (users we've messaged with)
-      const partnerIdsRes = await axiosInstance.get(
-        "/messages/chat-partner-ids",
-      );
+      const partnerIdsRes = await axiosInstance.get("/messages/chat-partner-ids");
       const chatPartnerIds = partnerIdsRes.data;
 
-      // Filter contacts to only show users we've chatted with, sorted by name
       const chatPartners = allContacts
         .filter((contact) => chatPartnerIds.includes(contact._id))
         .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-      console.log(
-        "[Chat] getMyChatPartners - found",
-        chatPartners.length,
-        "chat partners",
-      );
       set({ chats: chatPartners });
     } catch (error) {
-      console.error("[Chat] getMyChatPartners error:", error);
-      toast.error(error.response?.data?.message || "Failed to load chats");
+      toast.error("Failed to load chats");
     } finally {
       set({ isUsersLoading: false });
     }
   },
 
   getMessagesByUserId: async (userId) => {
-    const { isSecureStorageRestored } = useAuthStore.getState();
-    if (!isSecureStorageRestored) {
-      return;
-    }
-
     set({ isMessagesLoading: true });
     try {
+      const { authUser } = useAuthStore.getState();
       const res = await axiosInstance.get(`/messages/${userId}`);
-      set({ messages: res.data });
+      
+      const ciphertexts = res.data;
+      const plaintexts = [];
+
+      // Decrypt messages sequentially to maintain Signal Protocol chain state integrity
+      for (const msg of ciphertexts) {
+        try {
+          if (msg.senderId === authUser._id) {
+            // Sender cannot decrypt their own ciphertext (Signal is asymmetric).
+            // Check message plaintext cache first — populated when message was sent.
+            const cached = await getCachedMessage(msg._id);
+            if (cached) {
+              msg.text = cached;
+            } else {
+              msg.text = "[Bạn đã gửi tin nhắn mã hóa]";
+            }
+          } else if (!msg.ciphertext || !msg.messageType) {
+            // Message has no encrypted data (e.g. image-only or legacy format)
+            msg.text = msg.text || "";
+          } else {
+            // Check message cache first (Zalo/WhatsApp model):
+            // If we've successfully decrypted this message before, use the cached plaintext.
+            // This is the key mechanism that allows reading old messages after backup restore.
+            const cached = await getCachedMessage(msg._id);
+            if (cached !== undefined && cached !== null) {
+              msg.text = cached;
+            } else {
+              // Not cached yet — try Signal decryption
+              const dec = await decryptWithSignal(
+                authUser._id,
+                msg.senderId,
+                msg.ciphertext,
+                msg.messageType
+              );
+              msg.text = dec;
+              // Save to cache so future loads and backup restores can access this plaintext
+              await cacheMessage(msg._id, dec);
+              useAuthStore.getState().autoBackupKeys();
+            }
+          }
+        } catch (e) {
+          // Classify the error for better UX messaging
+          const errMsg = e?.message || "";
+          if (
+            errMsg.includes("MessageCounterError") ||
+            errMsg.includes("key not found") ||
+            errMsg.includes("No record for") ||
+            errMsg.includes("No session") ||
+            // "Bad MAC" = ratchet already advanced past this message (forward secrecy).
+            // Happens when the same message is decrypted a second time after a
+            // backup/restore cycle. The key was deleted after the first decryption.
+            errMsg.includes("Bad MAC") ||
+            errMsg.includes("bad mac") ||
+            errMsg.includes("MAC")
+          ) {
+            // Old message from a previous session — expected after key regeneration or
+            // after restoring from backup (session already past these messages)
+            msg.text = "🔒 [Tin nhắn từ phiên cũ - không thể giải mã]";
+          } else {
+            console.warn("[Chat] Decrypt error for msg", msg._id, errMsg);
+            msg.text = "⚠️ [Giải mã thất bại]";
+          }
+        }
+        plaintexts.push(msg);
+      }
+
+      set({ messages: plaintexts });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Something went wrong");
+      console.error(error);
+      toast.error("Something went wrong loading messages");
     } finally {
       set({ isMessagesLoading: false });
     }
@@ -98,7 +143,6 @@ export const useChatStore = create((set, get) => ({
     const { authUser } = useAuthStore.getState();
 
     const tempId = `temp-${Date.now()}`;
-
     const optimisticMessage = {
       _id: tempId,
       senderId: authUser._id,
@@ -109,35 +153,51 @@ export const useChatStore = create((set, get) => ({
       isOptimistic: true,
     };
 
-    // Update UI immediately with optimistic message
     set({ messages: [...messages, optimisticMessage] });
-    console.log("[Chat] Sending message to:", selectedUser._id);
 
     try {
-      const res = await axiosInstance.post(
-        `/messages/send/${selectedUser._id}`,
-        messageData,
-      );
-      console.log("[Chat] Message sent successfully, response:", res.data);
+      // 1. Fetch recipient's public key bundle
+      const bundleRes = await axiosInstance.get(`/keys/${selectedUser._id}`);
+      const recipientBundle = bundleRes.data;
 
-      // Remove optimistic message and add real one from server
+      // 2. Encrypt message locally
+      const { ciphertext, messageType, sessionId } = await encryptWithSignal(
+        authUser._id,
+        selectedUser._id,
+        recipientBundle,
+        messageData.text
+      );
+
+      // 3. Send ciphertext to backend
+      const payload = {
+        ciphertext,
+        messageType,
+        sessionId,
+        image: messageData.image
+      };
+
+      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, payload);
+      
+      // 4. Cache the sent plaintext so we can display it on reload
+      // (Signal is asymmetric — sender can't decrypt their own ciphertext)
+      if (res.data._id && messageData.text) {
+        await cacheMessage(res.data._id, messageData.text);
+        useAuthStore.getState().autoBackupKeys();
+      }
+
+      // Update UI: replace optimistic message with the resolved one from server.
+      // E2EE caveat: server returns the ciphertext. So we inject our plaintext over it.
+      const resolvedMessage = { ...res.data, text: messageData.text };
+
       const currentMessages = get().messages;
       const withoutOptimistic = currentMessages.filter((m) => m._id !== tempId);
-      set({ messages: [...withoutOptimistic, res.data] });
-
-      // Auto-backup crypto state after sending so next login can decrypt new messages
-      const { sessionPin } = useAuthStore.getState();
-      if (sessionPin) {
-        axiosInstance.post("/secure-storage/backup", { pin: sessionPin }).catch((e) => {
-          console.warn("[Chat] Auto-backup after send failed:", e);
-        });
-      }
+      set({ messages: [...withoutOptimistic, resolvedMessage] });
+      
     } catch (error) {
-      console.error("[Chat] Error sending message:", error);
-      // remove optimistic message on failure
+      console.error("[Chat] Error sending encrypted message:", error);
       const currentMessages = get().messages;
       set({ messages: currentMessages.filter((m) => m._id !== tempId) });
-      toast.error(error.response?.data?.message || "Something went wrong");
+      toast.error("Failed to send encrypted message");
     }
   },
 
@@ -146,38 +206,63 @@ export const useChatStore = create((set, get) => ({
     if (!selectedUser) return;
 
     const socket = useAuthStore.getState().socket;
-    if (!socket) {
-      console.warn("[Chat] Socket not available yet");
-      return;
-    }
+    const authUser = useAuthStore.getState().authUser;
+    if (!socket || !authUser) return;
 
-    console.log("[Chat] Subscribing to messages from user:", selectedUser._id);
-    console.log("[Chat] Socket connected?", socket.connected);
+    // Remove any existing listeners to prevent duplicates
+    socket.off("newMessage");
 
-    socket.on("newMessage", (newMessage) => {
-      console.log("[Chat] Received newMessage:", newMessage);
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
-      console.log(
-        "[Chat] Message from selected user?",
-        isMessageSentFromSelectedUser,
-      );
+    socket.on("newMessage", async (newMessage) => {
+      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
 
       if (!isMessageSentFromSelectedUser) {
-        console.log("[Chat] Ignoring message from different user");
         return;
       }
 
+      // Decrypt incoming message
+      try {
+        const plainText = await decryptWithSignal(
+          authUser._id,
+          newMessage.senderId,
+          newMessage.ciphertext,
+          newMessage.messageType
+        );
+        newMessage.text = plainText;
+
+        // Cache the decrypted plaintext immediately for future backup restores
+        if (newMessage._id) {
+          await cacheMessage(newMessage._id, plainText);
+          useAuthStore.getState().autoBackupKeys();
+        }
+      } catch (e) {
+        const errMsg = e?.message || "";
+        console.error("[Chat] Failed to decrypt real-time message:", errMsg);
+        if (
+          errMsg.includes("MessageCounterError") ||
+          errMsg.includes("key not found") ||
+          errMsg.includes("No record for") ||
+          errMsg.includes("No session") ||
+          // "Bad MAC" = session state mismatch (ratchet already advanced).
+          // Resolves itself once both sides exchange a fresh PreKey message.
+          errMsg.includes("Bad MAC") ||
+          errMsg.includes("bad mac") ||
+          errMsg.includes("MAC")
+        ) {
+          // Session mismatch — the sender is using an old session with us.
+          // This resolves itself once BOTH sides exchange a fresh PreKey message.
+          newMessage.text = "🔒 [Tin nhắn từ phiên cũ - không thể giải mã]";
+        } else {
+          newMessage.text = "⚠️ [Giải mã thất bại]";
+        }
+      }
+
       const currentMessages = get().messages;
-      console.log("[Chat] Adding message to messages array");
       set({ messages: [...currentMessages, newMessage] });
 
       if (isSoundEnabled) {
         const notificationSound = new Audio("/sounds/notification.mp3");
         notificationSound.currentTime = 0;
-        notificationSound
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        notificationSound.play().catch((e) => console.log("Audio play failed:", e));
       }
     });
   },
@@ -186,7 +271,6 @@ export const useChatStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (socket) {
       socket.off("newMessage");
-      console.log("[Chat] Unsubscribed from messages");
     }
   },
 }));

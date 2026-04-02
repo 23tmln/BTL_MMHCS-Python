@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Optional, Union
 from datetime import datetime
 from bson import ObjectId
 
@@ -17,7 +17,9 @@ class PyObjectId(ObjectId):
 
 
 class MessageCreate(BaseModel):
-    text: str  # plaintext from client
+    ciphertext: str
+    messageType: Union[int, str]
+    sessionId: Optional[str] = None
     image: Optional[str] = None
 
 
@@ -25,9 +27,9 @@ class Message(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     senderId: str
     receiverId: str
-    ciphertext: str  # encrypted message from crypto service
-    messageType: Literal["prekey", "signal"]  # from crypto service
-    sessionId: str  # from crypto service
+    ciphertext: str
+    messageType: Union[int, str]
+    sessionId: Optional[str] = None
     image: Optional[str] = None
     createdAt: Optional[datetime] = None
 
@@ -40,7 +42,9 @@ class MessageResponse(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     senderId: str
     receiverId: str
-    text: str  # decrypted plaintext for client
+    ciphertext: str
+    messageType: Union[int, str]
+    sessionId: Optional[str] = None
     image: Optional[str] = None
     createdAt: Optional[datetime] = None
 

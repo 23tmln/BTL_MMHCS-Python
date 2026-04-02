@@ -61,7 +61,7 @@ for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -Ad
 
 echo.
 echo ════════════════════════════════════════
-echo ✨ Chatify is now running! ✨
+echo Chatify is now running! 
 echo ════════════════════════════════════════
 echo.
 echo [Localhost]

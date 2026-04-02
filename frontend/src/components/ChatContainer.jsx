@@ -19,15 +19,10 @@ function ChatContainer() {
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
-  const { isSecureStorageConfigured, isSecureStorageRestored } = useAuthStore();
+  const { isSignalConfigured } = useAuthStore();
 
   useEffect(() => {
-    if (!selectedUser) return;
-
-    if (!isSecureStorageRestored && isSecureStorageConfigured !== false) {
-      // Secure storage requires restore first, do not load messages yet
-      return;
-    }
+    if (!selectedUser || !isSignalConfigured) return;
 
     getMessagesByUserId(selectedUser._id);
     subscribeToMessages();
@@ -39,8 +34,7 @@ function ChatContainer() {
     getMessagesByUserId,
     subscribeToMessages,
     unsubscribeFromMessages,
-    isSecureStorageConfigured,
-    isSecureStorageRestored,
+    isSignalConfigured,
   ]);
 
   useEffect(() => {

@@ -129,11 +129,15 @@ async def send_message_route(id: str, request: Request, response: Response, user
             )
         
         data = await request.json()
-        text = data.get("text")
+        ciphertext = data.get("ciphertext")
+        message_type = data.get("messageType")
+        session_id = data.get("sessionId")
         image = data.get("image")
         
         sender_id = str(user.get("_id"))
-        result, status_code = await send_message(sender_id, id, text, image)
+        result, status_code = await send_message(
+            sender_id, id, ciphertext, message_type, session_id, image
+        )
         
         response.status_code = status_code
         return result

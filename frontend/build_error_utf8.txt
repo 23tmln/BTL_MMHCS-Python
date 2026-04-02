@@ -1,0 +1,269 @@
+﻿
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v7.1.4 [32mbuilding for production...[36m[39m
+transforming...
+
+≡ƒî╝   [35mdaisyUI[39m [2m4.12.24[22m
+Γö£ΓöÇ [32mΓ£ö∩╕Ä[39m 2 themes added[2m		https://daisyui.com/docs/themes[22m
+Γò░ΓöÇ [32mΓ¥ñ∩╕Ä[39m [0mSupport daisyUI project:[0m	[2mhttps://opencollective.com/daisyui[22m
+
+node.exe : [33m[plugin 
+vite:resolve] Module 
+"node:buffer" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/in
+dex.js". See https://vit
+e.dev/guide/troubleshoot
+ing.html#module-external
+ized-for-browser-compati
+bility for more 
+details.[39m
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo      
+        : NotSpecified  
+  : ([33m[plugin vi.   
+ ..e details.[39m:S    
+tring) [], RemoteEx    
+ception
+    + FullyQualifiedErr 
+   orId : NativeComman  
+  dError
+ 
+[33m[plugin 
+vite:resolve] Module 
+"node:crypto" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/us
+ernames.js". See https:/
+/vite.dev/guide/troubles
+hooting.html#module-exte
+rnalized-for-browser-com
+patibility for more 
+details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"node:buffer" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/Ad
+dress.js". See https://v
+ite.dev/guide/troublesho
+oting.html#module-extern
+alized-for-browser-compa
+tibility for more 
+details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"node:buffer" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/ne
+t/CDSI.js". See https://
+vite.dev/guide/troublesh
+ooting.html#module-exter
+nalized-for-browser-comp
+atibility for more 
+details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"node:buffer" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/ne
+t/chat/UnauthUsernamesSe
+rvice.js". See https://v
+ite.dev/guide/troublesho
+oting.html#module-extern
+alized-for-browser-compa
+tibility for more 
+details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"fs" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/node-gyp-bu
+ild/node-gyp-build.js". 
+See https://vite.dev/gui
+de/troubleshooting.html#
+module-externalized-for-
+browser-compatibility 
+for more details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"path" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/node-gyp-bu
+ild/node-gyp-build.js". 
+See https://vite.dev/gui
+de/troubleshooting.html#
+module-externalized-for-
+browser-compatibility 
+for more details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"os" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/node-gyp-bu
+ild/node-gyp-build.js". 
+See https://vite.dev/gui
+de/troubleshooting.html#
+module-externalized-for-
+browser-compatibility 
+for more details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"node:crypto" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/Ac
+countKeys.js". See https
+://vite.dev/guide/troubl
+eshooting.html#module-ex
+ternalized-for-browser-c
+ompatibility for more 
+details.[39m
+[33m[plugin 
+vite:resolve] Module 
+"node:assert" has been 
+externalized for 
+browser compatibility, 
+imported by "C:/Users/AD
+MIN/btl_final2/frontend/
+node_modules/@signalapp/
+libsignal-client/dist/ne
+t/FakeChat.js". See http
+s://vite.dev/guide/troub
+leshooting.html#module-e
+xternalized-for-browser-
+compatibility for more 
+details.[39m
+[32mΓ£ô[39m 1844 modules transformed.
+[31mΓ£ù[39m Build 
+failed in 2.14s
+[31merror during build:
+[31mnode_modules/@signa
+lapp/libsignal-client/di
+st/Address.js (7:9): 
+"Buffer" is not 
+exported by "__vite-brow
+ser-external", imported 
+by "node_modules/@signal
+app/libsignal-client/dis
+t/Address.js".[31m
+file: [36mC:/Users/ADMI
+N/btl_final2/frontend/no
+de_modules/@signalapp/li
+bsignal-client/dist/Addr
+ess.js:7:9[31m
+[33m
+5: import * as Native 
+from './Native.js';
+6: import * as uuid 
+from 'uuid';
+7: import { Buffer } 
+from 'node:buffer';
+            ^
+8: import { parseUuid } 
+from './uuid.js';
+9: export var 
+ServiceIdKind;
+[31m
+    at getRollupError (f
+ile:///C:/Users/ADMIN/bt
+l_final2/frontend/node_m
+odules/rollup/dist/es/sh
+ared/parseAst.js:401:41)
+    at error (file:///C:
+/Users/ADMIN/btl_final2/
+frontend/node_modules/ro
+llup/dist/es/shared/pars
+eAst.js:397:42)
+    at Module.error (fil
+e:///C:/Users/ADMIN/btl_
+final2/frontend/node_mod
+ules/rollup/dist/es/shar
+ed/node-entry.js:16915:1
+6)
+    at 
+Module.traceVariable (fi
+le:///C:/Users/ADMIN/btl
+_final2/frontend/node_mo
+dules/rollup/dist/es/sha
+red/node-entry.js:17367:
+29)
+    at ModuleScope.findV
+ariable (file:///C:/User
+s/ADMIN/btl_final2/front
+end/node_modules/rollup/
+dist/es/shared/node-entr
+y.js:15037:39)
+    at 
+ChildScope.findVariable 
+(file:///C:/Users/ADMIN/
+btl_final2/frontend/node
+_modules/rollup/dist/es/
+shared/node-entry.js:562
+6:38)
+    at ClassBodyScope.fi
+ndVariable (file:///C:/U
+sers/ADMIN/btl_final2/fr
+ontend/node_modules/roll
+up/dist/es/shared/node-e
+ntry.js:5626:38)
+    at 
+ChildScope.findVariable 
+(file:///C:/Users/ADMIN/
+btl_final2/frontend/node
+_modules/rollup/dist/es/
+shared/node-entry.js:562
+6:38)
+    at FunctionScope.fin
+dVariable (file:///C:/Us
+ers/ADMIN/btl_final2/fro
+ntend/node_modules/rollu
+p/dist/es/shared/node-en
+try.js:5626:38)
+    at FunctionBodyScope
+.findVariable (file:///C
+:/Users/ADMIN/btl_final2
+/frontend/node_modules/r
+ollup/dist/es/shared/nod
+e-entry.js:5626:38)[39m

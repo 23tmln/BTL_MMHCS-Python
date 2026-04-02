@@ -1,35 +1,29 @@
 import axios from "axios";
 
-// Dynamically determine API base URL based on current location
-// In development: use same hostname as frontend but with backend port (3000)
-// In production: use relative path (same origin)
+// In development, use relative paths so Vite's proxy handles the forwarding.
+// This avoids mixed content issues (HTTPS frontend → HTTP backend).
+// In production, API is served from the same origin.
 const getApiBaseUrl = () => {
-  if (import.meta.env.MODE === "development") {
-    const protocol = window.location.protocol; // http: or https:
-    const hostname = window.location.hostname;
-    return `${protocol}//${hostname}:3000`;
-  }
-  return window.location.origin;
+  // Always use relative path — Vite proxy (dev) or same-origin server (prod) will handle it
+  return "";
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
 export const axiosInstance = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: `/api`,
   withCredentials: true,
 });
 
 // Utility function to convert relative image URLs to absolute backend URLs
 export const getImageUrl = (imagePath) => {
   if (!imagePath) return null;
-  // If it's already an absolute URL, return it as is
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return imagePath;
   }
-  // If it's a data URL (base64), return it as is
   if (imagePath.startsWith("data:")) {
     return imagePath;
   }
-  // Otherwise, prepend the backend URL
-  return `${API_BASE_URL}${imagePath}`;
+  // Relative path — will work via Vite proxy in dev, same-origin in prod
+  return imagePath;
 };

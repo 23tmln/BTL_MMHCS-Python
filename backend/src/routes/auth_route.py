@@ -32,13 +32,15 @@ async def signup_route(request: Request, response: Response):
         
         if status_code == 201 and token:
             # Set JWT cookie
+            # samesite="none" is required because the frontend (Vite HTTPS proxy)
+            # and backend (HTTP) are cross-origin. SameSite=None requires Secure=True.
             response.set_cookie(
                 key="jwt",
                 value=token,
                 max_age=7 * 24 * 60 * 60,
                 httponly=True,
-                samesite="strict",
-                secure=False  # Set to True in production
+                samesite="none",
+                secure=True
             )
         
         response.status_code = status_code
@@ -71,13 +73,15 @@ async def login_route(request: Request, response: Response):
         
         if status_code == 200 and token:
             # Set JWT cookie
+            # samesite="none" is required because the frontend (Vite HTTPS proxy)
+            # and backend (HTTP) are cross-origin. SameSite=None requires Secure=True.
             response.set_cookie(
                 key="jwt",
                 value=token,
                 max_age=7 * 24 * 60 * 60,
                 httponly=True,
-                samesite="strict",
-                secure=False  # Set to True in production
+                samesite="none",
+                secure=True
             )
         
         response.status_code = status_code
@@ -97,8 +101,9 @@ async def logout_route(response: Response):
     try:
         result, status_code = await logout()
         
-        # Clear JWT cookie
-        response.delete_cookie(key="jwt")
+        # Clear JWT cookie — must specify same samesite/secure attrs as when it was set
+        # otherwise some browsers won't actually delete it
+        response.delete_cookie(key="jwt", httponly=True, samesite="none", secure=True)
         
         response.status_code = status_code
         return result
@@ -192,7 +197,7 @@ async def fido_callback_route(token: str, request: Request, response: Response):
         value=token,
         max_age=7 * 24 * 60 * 60,
         httponly=True,
-        samesite="strict",
-        secure=False
+        samesite="none",
+        secure=True
     )
     return redirect_res

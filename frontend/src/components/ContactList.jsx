@@ -5,12 +5,13 @@ import { useAuthStore } from "../store/useAuthStore";
 
 function ContactList() {
   const { getAllContacts, allContacts, setSelectedUser, isUsersLoading } = useChatStore();
-  const { onlineUsers, isSecureStorageConfigured, isSecureStorageRestored } = useAuthStore();
+  const { onlineUsers, isSignalConfigured } = useAuthStore();
 
   useEffect(() => {
-    if (!isSecureStorageRestored && isSecureStorageConfigured !== false) return;
-    getAllContacts();
-  }, [getAllContacts, isSecureStorageConfigured, isSecureStorageRestored]);
+    if (isSignalConfigured) {
+      getAllContacts();
+    }
+  }, [getAllContacts, isSignalConfigured]);
 
   if (isUsersLoading) return <UsersLoadingSkeleton />;
 

@@ -1,12 +1,12 @@
 import { useState, useRef } from "react";
-import { LogOutIcon, VolumeOffIcon, Volume2Icon } from "lucide-react";
+import { LogOutIcon, VolumeOffIcon, Volume2Icon, CloudUploadIcon } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 
 const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
 
 function ProfileHeader() {
-  const { logout, authUser, updateProfile } = useAuthStore();
+  const { logout, authUser, updateProfile, openManualBackup } = useAuthStore();
   const { isSoundEnabled, toggleSound } = useChatStore();
   const [selectedImg, setSelectedImg] = useState(null);
 
@@ -67,9 +67,23 @@ function ProfileHeader() {
 
         {/* BUTTONS */}
         <div className="flex gap-4 items-center">
+          {/* CLOUD BACKUP BTN */}
+          <button
+            className="text-slate-400 hover:text-slate-200 transition-colors tooltip tooltip-bottom"
+            data-tip="Cập nhật Backup lên Cloud (Lưu lịch sử chat)"
+            onClick={() => {
+              mouseClickSound.currentTime = 0;
+              mouseClickSound.play().catch(() => {});
+              openManualBackup();
+            }}
+          >
+            <CloudUploadIcon className="size-5" />
+          </button>
+
           {/* LOGOUT BTN */}
           <button
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-slate-400 hover:text-slate-200 transition-colors tooltip tooltip-bottom"
+            data-tip="Đăng xuất"
             onClick={logout}
           >
             <LogOutIcon className="size-5" />

@@ -1,134 +1,111 @@
-from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
-from src.lib.crypto_client import generate_keys_for_user, get_public_bundle, encrypt_message, decrypt_message
+from fastapi import APIRouter, Request, Depends, HTTPException, status
 from src.middleware.auth_middleware import protect_route
+from src.lib.db import get_db
 
-router = APIRouter(prefix="/api/crypto", tags=["crypto"])
+router = APIRouter(prefix="/api/keys", tags=["keys"])
 
 
-@router.post("/generate-keys")
-async def generate_keys_route(request: Request, user=Depends(protect_route)):
-    """Generate encryption keys for the authenticated user"""
+@router.post("/upload")
+async def upload_keys_route(request: Request, user=Depends(protect_route)):
+    """Upload public keys bundle for the authenticated user"""
     try:
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
         user_id = str(user.get("_id"))
-        result = await generate_keys_for_user(user_id)
+        bundle_data = await request.json()
+        db = get_db()
 
-        return result
+        await db["key_bundles"].update_one(
+            {"userId": user_id},
+            {"$set": {"userId": user_id, "bundle": bundle_data}},
+            upsert=True
+        )
+        print(f"[Keys] Public bundle uploaded for userId: {user_id}")
+        return {"message": "Keys uploaded successfully"}
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in generate_keys route: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
+        print(f"Error in upload_keys route: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
-@router.get("/bundle")
-async def get_bundle_route(user=Depends(protect_route)):
-    """Get public key bundle for the authenticated user"""
+@router.post("/backup")
+async def upload_encrypted_backup(request: Request, user=Depends(protect_route)):
+    """Store an encrypted private key backup blob. Server never sees plaintext or passphrase."""
     try:
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
         user_id = str(user.get("_id"))
-        bundle = await get_public_bundle(user_id)
+        body = await request.json()
+        encrypted_bundle = body.get("encryptedBundle")
 
-        if not bundle:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Bundle not found"
-            )
+        if not encrypted_bundle:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="encryptedBundle is required")
 
-        return bundle
+        db = get_db()
+        await db["key_backups"].update_one(
+            {"userId": user_id},
+            {"$set": {"userId": user_id, "encryptedBundle": encrypted_bundle}},
+            upsert=True
+        )
+        print(f"[Keys] Encrypted backup stored for userId: {user_id}")
+        return {"message": "Encrypted backup stored successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in upload_encrypted_backup: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+# NOTE: This route MUST be defined BEFORE GET /{target_user_id}.
+# FastAPI matches routes top-to-bottom; if the wildcard route came first,
+# requests to /backup/me would be captured with target_user_id="me".
+@router.get("/backup/me")
+async def get_encrypted_backup(user=Depends(protect_route)):
+    """Retrieve the encrypted private key backup blob for the authenticated user."""
+    try:
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+        user_id = str(user.get("_id"))
+        db = get_db()
+        doc = await db["key_backups"].find_one({"userId": user_id})
+        print(f"[Keys] Backup lookup for userId: {user_id} — found: {doc is not None}")
+
+        if not doc or "encryptedBundle" not in doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No backup found")
+
+        return {"encryptedBundle": doc["encryptedBundle"]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in get_encrypted_backup: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+# NOTE: Wildcard route — must be LAST among GET routes in this router.
+@router.get("/{target_user_id}")
+async def get_bundle_route(target_user_id: str, user=Depends(protect_route)):
+    """Get public key bundle for a specific user"""
+    try:
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+        db = get_db()
+        key_doc = await db["key_bundles"].find_one({"userId": target_user_id})
+
+        if not key_doc or "bundle" not in key_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bundle not found")
+
+        return key_doc["bundle"]
 
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error in get_bundle route: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-
-@router.post("/encrypt")
-async def encrypt_route(request: Request, user=Depends(protect_route)):
-    """Encrypt a message"""
-    try:
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized"
-            )
-
-        data = await request.json()
-        sender_id = data.get("from")
-        receiver_id = data.get("to")
-        plaintext = data.get("plaintext")
-        recipient_bundle = data.get("recipientBundle")
-        
-        if not all([sender_id, receiver_id, plaintext, recipient_bundle]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing required fields: from, to, plaintext, recipientBundle"
-            )
-        
-        result = await encrypt_message(sender_id, receiver_id, plaintext, recipient_bundle)
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in encrypt route: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-
-@router.post("/decrypt")
-async def decrypt_route(request: Request, user=Depends(protect_route)):
-    """Decrypt a message"""
-    try:
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized"
-            )
-
-        data = await request.json()
-        sender_id = data.get("from")
-        receiver_id = data.get("to")
-        ciphertext = data.get("ciphertext")
-        message_type = data.get("messageType")
-        session_id = data.get("sessionId")
-        
-        if not all([sender_id, receiver_id, ciphertext, message_type, session_id]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing required fields: from, to, ciphertext, messageType, sessionId"
-            )
-        
-        result = await decrypt_message(sender_id, receiver_id, ciphertext, message_type, session_id)
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in decrypt route: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")

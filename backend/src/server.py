@@ -15,8 +15,6 @@ from src.lib.config import config
 from src.routes.auth_route import router as auth_router
 from src.routes.message_route import router as message_router
 from src.routes.crypto_route import router as crypto_router
-from src.routes.secure_storage_route import router as secure_storage_router
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -92,7 +90,6 @@ else:
 fastapi_app.include_router(auth_router)
 fastapi_app.include_router(message_router)
 fastapi_app.include_router(crypto_router)
-fastapi_app.include_router(secure_storage_router)
 
 # Serve uploaded images
 uploads_dir = os.path.join(os.path.dirname(__file__), "../uploads")
