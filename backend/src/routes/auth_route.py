@@ -32,15 +32,16 @@ async def signup_route(request: Request, response: Response):
         
         if status_code == 201 and token:
             # Set JWT cookie
-            # samesite="none" is required because the frontend (Vite HTTPS proxy)
-            # and backend (HTTP) are cross-origin. SameSite=None requires Secure=True.
+            # samesite="none" requires secure=True, which requires HTTPS.
+            # Fallback to lax and secure=False for local HTTP development.
+            is_https = request.url.scheme == "https"
             response.set_cookie(
                 key="jwt",
                 value=token,
                 max_age=7 * 24 * 60 * 60,
                 httponly=True,
-                samesite="none",
-                secure=True
+                samesite="none" if is_https else "lax",
+                secure=is_https
             )
         
         response.status_code = status_code
@@ -73,15 +74,16 @@ async def login_route(request: Request, response: Response):
         
         if status_code == 200 and token:
             # Set JWT cookie
-            # samesite="none" is required because the frontend (Vite HTTPS proxy)
-            # and backend (HTTP) are cross-origin. SameSite=None requires Secure=True.
+            # samesite="none" requires secure=True, which requires HTTPS.
+            # Fallback to lax and secure=False for local HTTP development.
+            is_https = request.url.scheme == "https"
             response.set_cookie(
                 key="jwt",
                 value=token,
                 max_age=7 * 24 * 60 * 60,
                 httponly=True,
-                samesite="none",
-                secure=True
+                samesite="none" if is_https else "lax",
+                secure=is_https
             )
         
         response.status_code = status_code
@@ -101,8 +103,8 @@ async def logout_route(response: Response):
     try:
         result, status_code = await logout()
         
-        # Clear JWT cookie — must specify same samesite/secure attrs as when it was set
-        # otherwise some browsers won't actually delete it
+        # Clear JWT cookie
+        response.delete_cookie(key="jwt", httponly=True, samesite="lax", secure=False)
         response.delete_cookie(key="jwt", httponly=True, samesite="none", secure=True)
         
         response.status_code = status_code
@@ -192,12 +194,13 @@ async def fido_callback_route(token: str, request: Request, response: Response):
         frontend_url = f"{config.CLIENT_URL}/"
 
     redirect_res = RedirectResponse(url=frontend_url, status_code=302)
+    is_https = request.url.scheme == "https"
     redirect_res.set_cookie(
         key="jwt",
         value=token,
         max_age=7 * 24 * 60 * 60,
         httponly=True,
-        samesite="none",
-        secure=True
+        samesite="none" if is_https else "lax",
+        secure=is_https
     )
     return redirect_res
