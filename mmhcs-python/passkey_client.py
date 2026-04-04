@@ -29,34 +29,10 @@ except (ImportError, AttributeError):
     WindowsClient = None
 
 
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).parent / ".env")
-
-def _get_origin():
-    from urllib.parse import urlparse
-    import socket
-    url = os.getenv("CHATIFY_BACKEND_URL", "http://localhost:3000")
-    if "localhost" not in url and "127.0.0.1" not in url:
-        parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.hostname or 'localhost'}"
-        
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(("8.8.8.8", 80))
-        lan_ip = s.getsockname()[0]
-        s.close()
-        return f"http://{lan_ip}"
-    except Exception:
-        return "https://localhost"
-
 # The origin must match the RP ID used by the server.
-# For local testing we use "https://localhost" or "http://<lan_ip>".
+# For local testing we use "https://localhost".
 # For production, set to your auth subdomain: ORIGIN = "https://auth.domain.com"
-ORIGIN = _get_origin()
+ORIGIN = "https://localhost"
 
 
 class CliInteraction(UserInteraction):

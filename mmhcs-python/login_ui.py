@@ -45,31 +45,8 @@ import credential_store
 
 load_dotenv(Path(__file__).parent / ".env")
 
-import socket
-
-def _auto_detect_server_url(url: str) -> str:
-    """Nếu URL trỏ tới localhost/127.0.0.1, tự thay bằng IP LAN thực của máy.
-    Dùng UDP socket trick để xác định interface đang active mà không cần gửi packet thật.
-    Chỉ có tác dụng khi mmhcs-python chạy trên MÁY CHỦ.
-    Khi chạy trên máy client, set CHATIFY_BACKEND_URL=http://<IP_SERVER>:3000 trong .env.
-    """
-    if "localhost" not in url and "127.0.0.1" not in url:
-        return url
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(("8.8.8.8", 80))
-        lan_ip = s.getsockname()[0]
-        s.close()
-        detected = url.replace("localhost", lan_ip).replace("127.0.0.1", lan_ip)
-        print(f"[LAN] Auto-detected server IP: {lan_ip} → {detected}")
-        return detected
-    except Exception as e:
-        print(f"[LAN] Could not auto-detect IP, using URL as-is: {e}")
-        return url
-
-_CHATIFY_BACKEND_URL = _auto_detect_server_url(os.getenv("CHATIFY_BACKEND_URL", "http://localhost:3000"))
-_CHATIFY_CLIENT_URL = _auto_detect_server_url(os.getenv("CHATIFY_CLIENT_URL", "http://localhost:5173"))
+_CHATIFY_BACKEND_URL = os.getenv("CHATIFY_BACKEND_URL", "http://localhost:3000")
+_CHATIFY_CLIENT_URL = os.getenv("CHATIFY_CLIENT_URL", "http://localhost:5173")
 
 # Hardcoded password — auth is handled by FIDO2 passkey, not password
 _HARDCODED_PASSWORD = "xK9#mQ2$vL7@nR4!pW6&jT8*"

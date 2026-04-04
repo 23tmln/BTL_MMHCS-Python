@@ -1,56 +1,70 @@
-# 📟 MMHCS Python Client - Ứng dụng Desktop Passkey
+# 🖥️ Chatify Desktop Client (Python & PyQt6)
 
-Ứng dụng Desktop client được viết bằng Python (PyQt6), chuyên dụng để thực hiện các thao tác xác thực Passkey (FIDO2/WebAuthn), quản lý danh tính bảo mật và tương tác với hệ thống backend Chatify qua mạng LAN.
+This subdirectory contains the Python-based Desktop Client for the **Chatify** secure messaging ecosystem. It serves as a high-security entry point, leveraging hardware-backed authentication (Passkeys) and secondary 2FA layers before granting access to the encrypted messaging environment.
 
-## 🌟 Các tính năng chính
+## 🌟 Key Features
 
-- **Xác thực FIDO2/WebAuthn**: Hỗ trợ đăng nhập và đăng ký không mật khẩu sử dụng vân tay (Windows Hello) hoặc khóa bảo mật USB (Yubikey).
-- **Giao diện PyQt6**: Giao diện người dùng desktop hiện đại, trực quan cho các tác vụ quản lý bảo mật.
-- **Tương tác LAN**: Tự động nhận diện IP mạng LAN để kết nối tới máy chủ backend.
-- **Lưu trữ bảo mật**: Quản lý các chứng chỉ (Credentials) cục bộ an toàn.
+- **PyQt6 Luxury UI**: A sleek, modern "Black & White" themed interface designed for high-end user experience.
+- **Passkey Authentication (FIDO2/WebAuthn)**: Professional-grade passwordless security. Uses local authenticators (Windows Hello, TouchID, or Security Keys) to eliminate phishing risks.
+- **Mandatory 2FA (TOTP)**: Automatic setup of Two-Factor Authentication via QR Code (compatible with Google Authenticator, Authy, etc.) during the first login.
+- **Crypto Integration**: Prepared for Pysignal (Signal Protocol) for native end-to-end encryption handling within the Python environment.
+- **Hybrid Bridge**: Authenticates users locally and securely bridges them to the web-based chat interface upon success.
 
-## 🛠️ Cài đặt
+## 🛠️ Technology Stack
 
-### Yêu cầu hệ thống
-- Python 3.9 trở lên.
-- Windows 10/11 (hỗ trợ Windows Hello) hoặc thiết bị FIDO2 USB trên Linux/macOS.
+- **GUI Framework**: [PyQt6](https://www.riverbankcomputing.com/software/pyqt/)
+- **Authentication**: `webauthn`, `fido2`, `pyotp`
+- **Networking**: `requests` (REST API communication with FastAPI Backend)
+- **Security**: `cryptography`, `PyJWT`
+- **Other**: `qrcode` (for 2FA setup), `python-dotenv` (configuration)
 
-### Các bước cài đặt
+## 🚀 Getting Started
 
-1. Di chuyển vào thư mục:
+### Prerequisites
+
+- Python 3.9 or higher
+- Access to the Chatify Backend server (ensure the backend is running)
+
+### Installation
+
+1. Navigate to this directory:
    ```bash
    cd mmhcs-python
    ```
 
-2. Tạo môi trường ảo (Khuyên dùng):
-   ```bash
-   python -m venv .venv
-   .\.venv\Scripts\activate  # Windows
-   source .venv/bin/activate # Linux/macOS
-   ```
-
-3. Cài đặt các thư viện phụ thuộc:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Cấu hình biến môi trường:
-   Sao chép `.env.example` thành `.env` và cập nhật các giá trị phù hợp:
-   ```bash
-   cp .env.example .env
+3. Configure Environment Variables:
+   Create a `.env` file based on `.env.example`:
+   ```env
+   CHATIFY_BACKEND_URL=http://your-backend-ip:3000
+   CHATIFY_CLIENT_URL=http://your-frontend-ip:5173
    ```
-   *Lưu ý: Đảm bảo `CHATIFY_BACKEND_URL` trỏ đúng vào địa chỉ IP của server backend.*
 
-## 🚀 Khởi chạy
+### Running the Client
 
-Để mở giao diện đăng nhập Desktop:
+Start the desktop login interface:
 ```bash
 python login_ui.py
 ```
 
-## 📁 Cấu trúc file quan trọng
+## 📁 Project Structure
 
-- `login_ui.py`: Điểm khởi đầu của ứng dụng (Main UI).
-- `passkey_client.py`: Wrapper xử lý logic FIDO2/WebAuthn (Windows Hello/HID Device).
-- `passkey_server.py`: Chứa các logic liên lạc với API Backend để thực hiện Challenge/Response.
-- `credential_store.py`: Quản lý việc lưu trữ và truy vấn danh tính người dùng cục bộ.
+- `login_ui.py`: The main entry point and GUI implementation.
+- `passkey_client.py` & `passkey_server.py`: Logic for FIDO2 registration and authentication ceremonies.
+- `credential_store.py`: Secure local management of user credentials, TOTP secrets, and passkey data.
+- `pysignal/`: Implementation of the Signal Protocol in Python for E2EE message processing.
+- `migrate_to_mongo.py`: Utility script for synchronizing local credentials to the central database.
+
+## 🔐 Security Architecture
+
+1. **API Handshake**: Validates basic user existence via the Backend REST API.
+2. **Passkey Ceremony**: Triggers the hardware-backed WebAuthn challenge.
+3. **2FA Verification**: If a TOTP secret exists, the user must provide a 6-digit code.
+4. **Session Handoff**: Upon full verification, the client generates a secure handoff to the web client.
+
+---
+*Part of the BTL Mật Mã Học Cơ Sở (Basic Cryptography Project)*
