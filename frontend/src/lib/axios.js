@@ -1,8 +1,12 @@
 import axios from "axios";
 
-// In development, use relative paths so Vite's proxy handles the forwarding.
-// This avoids mixed content issues (HTTPS frontend → HTTP backend).
-// In production, API is served from the same origin.
+/**
+ * axios.js
+ * Cấu hình thiết lập mặc định cho instance của thư viện Axios để gọi API.
+ * 
+ * - Môi trường Dev (cục bộ): Sử dụng proxy của Vite để tránh lỗi CORS và lấy cùng port.
+ * - Môi trường Prod: API được phục vụ từ cùng Origin (tên miền).
+ */
 const getApiBaseUrl = () => {
   // Always use relative path — Vite proxy (dev) or same-origin server (prod) will handle it
   return "";

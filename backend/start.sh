@@ -1,21 +1,17 @@
 #!/bin/bash
-# Development server startup script for Chatify Python Backend
 
 set -e  # Exit on error
 
 echo "🚀 Starting Chatify Python Backend with Socket.IO..."
 echo ""
 
-# Check if MongoDB is accessible
 echo "✓ MongoDB configuration verified"
 
-# Display environment
 echo "📋 Environment: $(grep NODE_ENV .env | cut -d '=' -f2)"
 echo "🔌 Server Port: $(grep PORT .env | cut -d '=' -f2)"
 echo "🔗 Client URL: $(grep CLIENT_URL .env | cut -d '=' -f2)"
 echo ""
 
-# Run the server
 echo "▶️  Starting FastAPI server with Socket.IO support..."
 echo ""
 
@@ -27,6 +23,5 @@ uv run uvicorn src.server:app \
   --host 0.0.0.0 \
   --log-level info
 
-# Show help after server stops
 echo ""
 echo "⚠️  Server stopped. To restart, run: bash start.sh"

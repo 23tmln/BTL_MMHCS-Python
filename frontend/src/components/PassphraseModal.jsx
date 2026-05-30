@@ -73,7 +73,7 @@ export default function PassphraseModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-base-300 relative">
-        {/* Close Button if already configured */}
+        {/* Nút Đóng nếu đã cấu hình xong */}
         {isSignalConfigured && (
           <button 
             className="absolute top-4 right-4 text-base-content/50 hover:text-base-content z-10 bg-base-100 rounded-full p-1 shadow-sm"
@@ -83,7 +83,7 @@ export default function PassphraseModal() {
           </button>
         )}
 
-        {/* Header */}
+        {/* Phần tiêu đề */}
         <div className={`p-6 text-center ${passphraseMode === "setup" ? "bg-primary/10" : "bg-warning/10"}`}>
           <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ${passphraseMode === "setup" ? "bg-primary/20" : "bg-warning/20"}`}>
             {passphraseMode === "setup" ? (
@@ -102,9 +102,9 @@ export default function PassphraseModal() {
           </p>
         </div>
 
-        {/* Body */}
+        {/* Phần nội dung */}
         <div className="p-6 space-y-4">
-          {/* Warning notice */}
+          {/* Bảng thông báo Cảnh báo */}
           <div className="flex items-start gap-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
             <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <p className="text-xs text-base-content/70">
@@ -112,7 +112,7 @@ export default function PassphraseModal() {
             </p>
           </div>
 
-          {/* Passphrase input */}
+          {/* Ô nhập Mật khẩu cấp 2 */}
           <div className="form-control">
             <label className="label">
               <span className="label-text font-medium">
@@ -141,7 +141,7 @@ export default function PassphraseModal() {
             </div>
           </div>
 
-          {/* Confirm passphrase (setup only) */}
+          {/* Xác nhận mật khẩu cấp 2 (chỉ dùng khi thiết lập mới) */}
           {passphraseMode === "setup" && (
             <div className="form-control">
               <label className="label">
@@ -159,7 +159,7 @@ export default function PassphraseModal() {
             </div>
           )}
 
-          {/* Error */}
+          {/* Thông báo lỗi */}
           {error && (
             <div className="alert alert-error py-2 text-sm">
               <X className="w-4 h-4" />
@@ -167,7 +167,7 @@ export default function PassphraseModal() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Cụm chức năng Hành động */}
           <div className="space-y-2 pt-1">
             {passphraseMode === "setup" ? (
               <>

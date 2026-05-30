@@ -1,13 +1,14 @@
 /**
  * cryptoBackup.js
- * Pure Web Crypto API utilities for encrypting/decrypting private key bundles
- * with a user-supplied passphrase. The server only ever sees the encrypted blob.
+ * Sử dụng Web Crypto API (được hỗ trợ sẵn trên trình duyệt) để mã hóa/giải mã 
+ * toàn bộ Bó Khóa Riêng Tư (Private Key bundles) bằng một Passphrase do người dùng nhập.
+ * Sau khi mã hóa, Server chỉ nhận được chuỗi vô nghĩa, đảm bảo server không thể đọc được khóa.
  * 
- * Crypto scheme:
- *   - Key derivation: PBKDF2-SHA256 (100,000 iterations), 16-byte random salt
- *   - Encryption:     AES-256-GCM, 12-byte random IV
+ * Lược đồ mã hóa:
+ *   - Tạo khóa (Key derivation): PBKDF2-SHA256 (100,000 vòng lặp), salt ngẫu nhiên 16-byte
+ *   - Mã hóa thực tế: AES-256-GCM, IV ngẫu nhiên 12-byte
  * 
- * Serialized encrypted bundle shape:
+ * Kết quả trả ra dạng JSON chuỗi:
  * {
  *   salt: "<base64>",
  *   iv:   "<base64>",
@@ -61,8 +62,8 @@ async function deriveKey(passphrase, salt) {
 }
 
 /**
- * Encrypt a JS object (the private key bundle) with a passphrase.
- * Returns a serialized JSON string safe to store/transmit as-is.
+ * Mã hóa một đối tượng Javascript (chứa gói Key riêng tư) bằng passphrase.
+ * Trả về chuỗi JSON an toàn đã mã hóa để gửi lên server lưu trữ.
  */
 export async function encryptPrivateBundle(bundleObject, passphrase) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -84,8 +85,9 @@ export async function encryptPrivateBundle(bundleObject, passphrase) {
 }
 
 /**
- * Decrypt the serialized encrypted bundle string with the user passphrase.
- * Returns the original JS object, or throws if passphrase is wrong.
+ * Giải mã chuỗi backup lưu từ server về lại thành Object (chứa gói Key và Session) 
+ * bằng passphrase người dùng nhập vào.
+ * Sẽ ném ra lỗi nếu passphrase sai hoặc file bị hỏng.
  */
 export async function decryptPrivateBundle(encryptedBundleString, passphrase) {
   let parsed;

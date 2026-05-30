@@ -1,7 +1,15 @@
 import { openDB } from 'idb';
 
+/**
+ * secureStore.js
+ * Lớp trừu tượng (Utility Wrapper) tương tác với cơ sở dữ liệu IndexedDB của trình duyệt.
+ * Lưu trữ bền vững và cục bộ:
+ * 1. keys: Các Key nhận dạng và Bundle của thiết bị (Private/Public Key).
+ * 2. sessions: Các phiên thiết lập mã hóa E2E đang duy trì với những người dùng khác.
+ * 3. messageCache: Bộ lưu trữ (cache) các tin nhắn đã được giải mã ít nhất một lần để tránh 
+ *    mất tin nhắn do vấn đề giải mã lại khi restore.
+ */
 const DB_NAME = 'ChatifyE2EE';
-// v2: added messageCache store for plaintext backup (Zalo/WhatsApp-style)
 const DB_VERSION = 2;
 
 export async function getDB() {
@@ -26,7 +34,7 @@ export async function getDB() {
   });
 }
 
-// Key Store Operations
+// --- CÁC HÀM TƯƠNG TÁC VỚI KHO LƯU BỘ KHÓA (KEYS) ---
 export async function saveKey(name, value) {
   const db = await getDB();
   return db.put('keys', value, name);
@@ -68,7 +76,7 @@ export async function restoreKeys(data) {
   await tx.done;
 }
 
-// Session Store Operations
+// --- CÁC HÀM TƯƠNG TÁC VỚI KHO LƯU PHIÊN BẢO MẬT (SESSIONS) ---
 export async function saveSession(address, sessionData) {
   const db = await getDB();
   return db.put('sessions', sessionData, address);
@@ -110,10 +118,11 @@ export async function restoreSessions(data) {
   await tx.done;
 }
 
-// --- Message Plaintext Cache ---
-// Stores decrypted plaintext keyed by messageId.
-// Included in backup bundle so old messages remain readable after restore
-// (same principle as Zalo/WhatsApp cloud backup).
+// --- BỘ ĐỆM TIN NHẮN (MESSAGE CACHE) ---
+// Lưu các văn bản Plaintext sau khi giải mã thành công (dựa theo messageId).
+// Dữ liệu này được đưa luôn vào Object Backup tải lên server. 
+// Do bản chất Signal sẽ xóa key của tin nhắn sau khi mở, giải pháp này giúp đảm bảo 
+// các phiên đăng nhập lại hoặc thiết bị mới từ điểm khôi phục vẫn xem được tin cũ.
 
 export async function getCachedMessage(messageId) {
   const db = await getDB();

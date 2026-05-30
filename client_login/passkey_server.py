@@ -12,26 +12,11 @@ from fido2.server import Fido2Server
 from fido2.webauthn import AttestedCredentialData
 
 import credential_store
-from urllib.parse import urlparse
-import socket
 
-def _get_rp_id():
-    url = os.getenv("CHATIFY_BACKEND_URL", "http://localhost:3000")
-    if "localhost" not in url and "127.0.0.1" not in url:
-        return urlparse(url).hostname or "localhost"
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        s.connect(("8.8.8.8", 80))
-        lan_ip = s.getsockname()[0]
-        s.close()
-        return lan_ip
-    except Exception:
-        return "localhost"
 
 # Relying Party configuration
 # For production, set to your domain: RP_ID = "domain.com"
-RP_ID = _get_rp_id()
+RP_ID = "localhost"
 RP_NAME = "MMHCS Auth"
 
 

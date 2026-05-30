@@ -30,7 +30,7 @@ function ProfileHeader() {
     <div className="p-6 border-b border-slate-700/50">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* AVATAR */}
+          {/* ẢNH ĐẠI DIỆN */}
           <div className="avatar online">
             <button
               className="size-14 rounded-full overflow-hidden relative group"
@@ -55,7 +55,7 @@ function ProfileHeader() {
             />
           </div>
 
-          {/* USERNAME & ONLINE TEXT */}
+          {/* TÊN NGƯỜI DÙNG & TRẠNG THÁI ONLINE */}
           <div>
             <h3 className="text-slate-200 font-medium text-base max-w-[180px] truncate">
               {authUser.fullName}
@@ -65,9 +65,9 @@ function ProfileHeader() {
           </div>
         </div>
 
-        {/* BUTTONS */}
+        {/* CÁC NÚT BẤM */}
         <div className="flex gap-4 items-center">
-          {/* CLOUD BACKUP BTN */}
+          {/* NÚT SAO LƯU ĐÁM MÂY */}
           <button
             className="text-slate-400 hover:text-slate-200 transition-colors tooltip tooltip-bottom"
             data-tip="Cập nhật Backup lên Cloud (Lưu lịch sử chat)"
@@ -80,7 +80,7 @@ function ProfileHeader() {
             <CloudUploadIcon className="size-5" />
           </button>
 
-          {/* LOGOUT BTN */}
+          {/* NÚT ĐĂNG XUẤT */}
           <button
             className="text-slate-400 hover:text-slate-200 transition-colors tooltip tooltip-bottom"
             data-tip="Đăng xuất"
@@ -89,12 +89,12 @@ function ProfileHeader() {
             <LogOutIcon className="size-5" />
           </button>
 
-          {/* SOUND TOGGLE BTN */}
+          {/* NÚT BẬT TẮT ÂM THANH */}
           <button
             className="text-slate-400 hover:text-slate-200 transition-colors"
             onClick={() => {
-              // play click sound before toggling
-              mouseClickSound.currentTime = 0; // reset to start
+              // phát âm thanh click trước khi chuyển đổi trạng thái
+              mouseClickSound.currentTime = 0; // đặt lại bài nhạc về mốc 0s
               mouseClickSound.play().catch((error) => console.log("Audio play failed:", error));
               toggleSound();
             }}
