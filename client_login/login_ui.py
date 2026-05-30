@@ -1067,8 +1067,13 @@ class LuxuryLoginWindow(QWidget):
             if not token:
                 raise ValueError("No API token available — login may have failed")
 
-            # Open browser to the fido-callback endpoint which sets the cookie
-            callback_url = f"{_CHATIFY_BACKEND_URL}/api/auth/fido-callback?token={token}"
+            # Open browser to the fido-callback endpoint which sets the cookie.
+            # IMPORTANT: route this through the Vite frontend proxy (HTTPS), NOT
+            # directly to the backend (HTTP).  Browsers silently discard cookies
+            # with secure=True that arrive over plain HTTP on non-localhost IPs.
+            # Vite proxies /api/* to the backend transparently, so the cookie is
+            # set from an HTTPS origin and is accepted by the browser.
+            callback_url = f"{_CHATIFY_CLIENT_URL}/api/auth/fido-callback?token={token}"
             webbrowser.open(callback_url)
 
             self.welcome_page.welcome_title.setText("✓ Launched!")
@@ -1076,8 +1081,8 @@ class LuxuryLoginWindow(QWidget):
                 f"Authenticated as '{username}'\nChatify is open in your browser."
             )
 
-            # Close the desktop window after 2 seconds
-            QTimer.singleShot(2000, self.close)
+            # Close the desktop window after 3 seconds
+            QTimer.singleShot(4000, self.close)
 
         except Exception as exc:
             self.welcome_page.welcome_title.setText("Launch Failed")
