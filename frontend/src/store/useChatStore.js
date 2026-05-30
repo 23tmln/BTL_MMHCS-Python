@@ -4,13 +4,16 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { encryptWithSignal, decryptWithSignal } from "../lib/signalHelper";
 import { getCachedMessage, cacheMessage } from "../lib/secureStore";
+import { createLocalMlsGroup, decryptGroupMessage, encryptGroupMessage, ensureMlsIdentity, processMlsCommit, processMlsWelcome } from "../lib/mlsClient";
 
 export const useChatStore = create((set, get) => ({
   allContacts: [],
   chats: [],
+  groups: [],
   messages: [],
   activeTab: "chats",
   selectedUser: null,
+  selectedGroup: null,
   isUsersLoading: false,
   isMessagesLoading: false,
   isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
@@ -21,9 +24,17 @@ export const useChatStore = create((set, get) => ({
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setSelectedUser: (selectedUser) => set({ selectedUser, selectedGroup: null, messages: [] }),
+  setSelectedGroup: (selectedGroup) => set({ selectedGroup, selectedUser: null, messages: [] }),
 
-  clearChat: () => set({ messages: [], chats: [], allContacts: [], selectedUser: null }),
+  clearChat: () => set({
+    messages: [],
+    chats: [],
+    groups: [],
+    allContacts: [],
+    selectedUser: null,
+    selectedGroup: null,
+  }),
 
   getAllContacts: async () => {
     set({ isUsersLoading: true });
@@ -58,12 +69,148 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  getMyGroups: async () => {
+    set({ isUsersLoading: true });
+    try {
+      const res = await axiosInstance.get("/groups");
+      set({ groups: res.data });
+    } catch (error) {
+      toast.error("Failed to load groups");
+    } finally {
+      set({ isUsersLoading: false });
+    }
+  },
+
+  ensureMlsReady: async () => {
+    const { authUser } = useAuthStore.getState();
+    if (!authUser) return;
+
+    const identity = await ensureMlsIdentity(authUser._id);
+    await axiosInstance.post("/groups/mls/credential", identity.credentialPayload);
+    await axiosInstance.post("/groups/mls/key-packages", identity.keyPackagePayload);
+  },
+
+  createGroup: async ({ name, memberIds }) => {
+    try {
+      const keyPackageRes = await axiosInstance.post("/groups/mls/key-packages/available", { memberIds });
+      const res = await axiosInstance.post("/groups", { name, memberIds });
+      await createLocalMlsGroup(res.data._id, useAuthStore.getState().authUser._id, keyPackageRes.data);
+      set({ groups: [res.data, ...get().groups], selectedGroup: res.data, selectedUser: null, activeTab: "groups", messages: [] });
+      toast.success("Group created");
+      return res.data;
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Failed to create group");
+      throw error;
+    }
+  },
+
+  getGroupMessages: async (groupId) => {
+    set({ isMessagesLoading: true });
+    try {
+      const res = await axiosInstance.get(`/groups/${groupId}/messages`);
+      const decrypted = [];
+      for (const message of res.data) {
+        try {
+          const text = message.ciphertext ? await decryptGroupMessage(groupId, message) : "";
+          decrypted.push({ ...message, text });
+        } catch (error) {
+          decrypted.push({ ...message, text: "[Không thể giải mã tin nhắn nhóm]" });
+        }
+      }
+      set({ messages: decrypted });
+    } catch (error) {
+      set({ selectedGroup: null, messages: [] });
+      get().getMyGroups();
+      toast.error(error?.response?.data?.error || "Failed to load group messages");
+    } finally {
+      set({ isMessagesLoading: false });
+    }
+  },
+
+  sendGroupMessage: async (messageData) => {
+    const { selectedGroup, messages } = get();
+    const { authUser } = useAuthStore.getState();
+    if (!selectedGroup || !authUser) return;
+
+    const tempId = `temp-group-${Date.now()}`;
+    const optimisticMessage = {
+      _id: tempId,
+      groupId: selectedGroup._id,
+      senderId: authUser._id,
+      text: messageData.text,
+      image: messageData.image,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true,
+    };
+
+    set({ messages: [...messages, optimisticMessage] });
+
+    try {
+      const encrypted = await encryptGroupMessage(selectedGroup._id, messageData.text || "");
+      const res = await axiosInstance.post(`/groups/${selectedGroup._id}/messages`, {
+        ciphertext: encrypted.ciphertext,
+        mlsEpoch: encrypted.mlsEpoch,
+        image: messageData.image,
+      });
+      const withoutOptimistic = get().messages.filter((message) => message._id !== tempId);
+      const resolvedMessage = { ...res.data, text: messageData.text };
+      set({ messages: [...withoutOptimistic, resolvedMessage] });
+      get().getMyGroups();
+    } catch (error) {
+      set({ messages: get().messages.filter((message) => message._id !== tempId) });
+      toast.error(error?.response?.data?.error || "Failed to send group message");
+    }
+  },
+
+  addGroupMembers: async (groupId, memberIds) => {
+    try {
+      const res = await axiosInstance.post(`/groups/${groupId}/members`, { memberIds });
+      set({
+        selectedGroup: res.data,
+        groups: get().groups.map((group) => group._id === groupId ? res.data : group),
+      });
+      toast.success("Members added");
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Failed to add members");
+      throw error;
+    }
+  },
+
+  removeGroupMember: async (groupId, memberId) => {
+    try {
+      const res = await axiosInstance.delete(`/groups/${groupId}/members/${memberId}`);
+      set({
+        selectedGroup: res.data,
+        groups: get().groups.map((group) => group._id === groupId ? res.data : group),
+      });
+      toast.success("Member removed");
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Failed to remove member");
+      throw error;
+    }
+  },
+
+  leaveGroup: async (groupId) => {
+    try {
+      await axiosInstance.post(`/groups/${groupId}/leave`);
+      set({
+        groups: get().groups.filter((group) => group._id !== groupId),
+        selectedGroup: null,
+        messages: [],
+      });
+      toast.success("Left group");
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Failed to leave group");
+      throw error;
+    }
+  },
+
   getMessagesByUserId: async (userId) => {
     set({ isMessagesLoading: true });
     try {
       const { authUser } = useAuthStore.getState();
       const res = await axiosInstance.get(`/messages/${userId}`);
-      
+
       const ciphertexts = res.data;
       const plaintexts = [];
 
@@ -177,7 +324,7 @@ export const useChatStore = create((set, get) => ({
       };
 
       const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, payload);
-      
+
       // 4. Cache the sent plaintext so we can display it on reload
       // (Signal is asymmetric — sender can't decrypt their own ciphertext)
       if (res.data._id && messageData.text) {
@@ -192,7 +339,7 @@ export const useChatStore = create((set, get) => ({
       const currentMessages = get().messages;
       const withoutOptimistic = currentMessages.filter((m) => m._id !== tempId);
       set({ messages: [...withoutOptimistic, resolvedMessage] });
-      
+
     } catch (error) {
       console.error("[Chat] Error sending encrypted message:", error);
       const currentMessages = get().messages;
@@ -267,10 +414,54 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  subscribeToGroupMessages: () => {
+    const { selectedGroup, isSoundEnabled } = get();
+    if (!selectedGroup) return;
+
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+
+    socket.off("newGroupMessage");
+    socket.on("newGroupMessage", async (newMessage) => {
+      const currentGroup = get().selectedGroup;
+      if (!currentGroup || newMessage.groupId !== currentGroup._id) return;
+
+      if (newMessage.mlsHandshake) {
+        if (newMessage.mlsHandshake.type === "welcome") {
+          await processMlsWelcome(currentGroup._id, newMessage.mlsHandshake.payload);
+        }
+        if (newMessage.mlsHandshake.type === "commit") {
+          await processMlsCommit(currentGroup._id, newMessage.mlsHandshake.payload, newMessage.mlsHandshake.epoch);
+        }
+        return;
+      }
+
+      try {
+        newMessage.text = newMessage.ciphertext ? await decryptGroupMessage(currentGroup._id, newMessage) : "";
+      } catch (error) {
+        newMessage.text = "[Không thể giải mã tin nhắn nhóm]";
+      }
+
+      set({ messages: [...get().messages, newMessage] });
+      if (isSoundEnabled) {
+        const notificationSound = new Audio("/sounds/notification.mp3");
+        notificationSound.currentTime = 0;
+        notificationSound.play().catch((e) => console.log("Audio play failed:", e));
+      }
+    });
+  },
+
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     if (socket) {
       socket.off("newMessage");
+    }
+  },
+
+  unsubscribeFromGroupMessages: () => {
+    const socket = useAuthStore.getState().socket;
+    if (socket) {
+      socket.off("newGroupMessage");
     }
   },
 }));

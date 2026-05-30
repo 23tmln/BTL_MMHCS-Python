@@ -10,11 +10,15 @@ import MessagesLoadingSkeleton from "./MessagesLoadingSkeleton";
 function ChatContainer() {
   const {
     selectedUser,
+    selectedGroup,
     getMessagesByUserId,
+    getGroupMessages,
     messages,
     isMessagesLoading,
     subscribeToMessages,
     unsubscribeFromMessages,
+    subscribeToGroupMessages,
+    unsubscribeFromGroupMessages,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
@@ -22,18 +26,28 @@ function ChatContainer() {
   const { isSignalConfigured } = useAuthStore();
 
   useEffect(() => {
-    if (!selectedUser || !isSignalConfigured) return;
+    if (!isSignalConfigured) return;
 
-    getMessagesByUserId(selectedUser._id);
-    subscribeToMessages();
+    if (selectedUser) {
+      getMessagesByUserId(selectedUser._id);
+      subscribeToMessages();
+      return () => unsubscribeFromMessages();
+    }
 
-    // clean up
-    return () => unsubscribeFromMessages();
+    if (selectedGroup) {
+      getGroupMessages(selectedGroup._id);
+      subscribeToGroupMessages();
+      return () => unsubscribeFromGroupMessages();
+    }
   }, [
     selectedUser,
+    selectedGroup,
     getMessagesByUserId,
+    getGroupMessages,
     subscribeToMessages,
     unsubscribeFromMessages,
+    subscribeToGroupMessages,
+    unsubscribeFromGroupMessages,
     isSignalConfigured,
   ]);
 
@@ -78,13 +92,12 @@ function ChatContainer() {
                 </div>
               </div>
             ))}
-            {/* 👇 scroll target */}
             <div ref={messageEndRef} />
           </div>
         ) : isMessagesLoading ? (
           <MessagesLoadingSkeleton />
         ) : (
-          <NoChatHistoryPlaceholder name={selectedUser.fullName} />
+          <NoChatHistoryPlaceholder name={selectedUser?.fullName || selectedGroup?.name} />
         )}
       </div>
 
