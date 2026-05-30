@@ -12,8 +12,9 @@ import { Curve25519Wrapper } from "@privacyresearch/curve25519-typescript";
 
 import { getKey, saveKey, getSession, saveSession, getAllKeys, getAllSessions, restoreKeys, restoreSessions, getAllCachedMessages, restoreCachedMessages } from "./secureStore.js";
 
-// ⚠️ REQUIRED: Initialize Web Crypto API and real Curve25519 implementation
-// This MUST run before any crypto operations. We initialize lazily on first use.
+// QUAN TRỌNG: Khởi tạo Web Crypto API và thư viện Curve25519 (Elliptic Curve) cho SignalProtocol
+// Việc này BẮT BUỘC phải thực hiện trước mọi thao tác mã hóa tiếp theo để tránh lỗi.
+// Chế độ khởi tạo lazy-loading (khi nào dùng mới gọi).
 let _initialized = false;
 let _curve = null;
 
@@ -168,10 +169,10 @@ export async function hasKeysForUser(userId) {
 }
 
 /**
- * Export the FULL private bundle (all keys + all sessions + message plaintext cache) for backup.
- * Returns a plain JS object safe to JSON.stringify and then encrypt.
- * The message cache is what allows old messages to be readable after restore,
- * similar to how Zalo/WhatsApp cloud backups work.
+ * Đóng gói TOÀN BỘ dữ liệu bảo mật (bao gồm Identity keys, PreKeys, toàn bộ các Session trò chuyện, và bộ nhớ cache plaintext).
+ * Hàm này dùng để gọi trước khi mã hóa đóng gói đẩy lên server (tạo file backup).
+ * Bộ nhớ cache tin nhắn (messageCache) là điểm cốt lõi giúp các tin nhắn cũ vẫn được hiển thị 
+ * mà không cần phải giải mã lại (Zalo/WhatsApp cũng lưu cache này trên máy chủ hoặc local db).
  */
 export async function exportFullPrivateBundle(userId) {
   await initSignal();
@@ -182,9 +183,9 @@ export async function exportFullPrivateBundle(userId) {
 }
 
 /**
- * Import (restore) a full private bundle from backup.
- * Keys and sessions are replaced. Message cache is MERGED (not replaced)
- * so messages decrypted after the backup was taken are preserved.
+ * Mở gói và nạp (import) lại file backup đã giải mã vào IndexedDB của trình duyệt.
+ * Các Key và session sẽ bị ghi đè. Nhưng thư mục bộ nhớ đệm (cache) plaintext tin nhắn 
+ * sẽ được HỢP NHẤT (merge) để bảo toàn các tin đã xem.
  */
 export async function importFullPrivateBundle(bundle) {
   await initSignal();
@@ -195,6 +196,7 @@ export async function importFullPrivateBundle(bundle) {
   console.log("[E2EE] Full private bundle restored from backup (keys + sessions + message cache)");
 }
 
+// Hàm tạo ra bộ key ban đầu cho người dùng mới (Identity, SignedPreKey, OneTimePreKey)
 export async function generateKeysForUser(userId) {
   await initSignal();
   const registrationId = KeyHelper.generateRegistrationId();
@@ -220,7 +222,7 @@ export async function generateKeysForUser(userId) {
   const store = new BrowserSignalProtocolStore(userId);
   await store.storeSignedPreKey(signedPreKeyId, signedPreKey.keyPair);
   await store.storePreKey(oneTimePreKeyId, oneTimePreKey.keyPair);
-  
+
   // Save signature so we don't need to recalculate it later
   await saveKey(`${userId}_signed_prekey_signature`, arrayBufferToBase64(signedPreKey.signature));
 
@@ -236,8 +238,9 @@ export async function generateKeysForUser(userId) {
   };
 }
 
-// Rebuild the PUBLIC bundle from existing local keys (use when user already has keys in IndexedDB)
-// This does NOT regenerate private keys — safe to call on every login to re-sync server bundle
+// Tái tạo lại Public Bundle (Bó public key) trực tiếp từ các khóa đang có ở Local IndexedDB
+// Hàm này KHÔNG tạo khóa private mới, nên rất an toàn để gọi khi user reload lại trang hoặc login lại
+// nhằm đồng bộ lên server.
 export async function getPublicBundleForUser(userId) {
   await initSignal();
   const identity = await getKey(userId);
@@ -317,6 +320,7 @@ export async function ensureOutboundSession(senderId, recipientId, recipientBund
   return { address, stored: store };
 }
 
+// Hàm trực tiếp nhận Plaintext từ UI, thiết lập phiên trò chuyện với recipientBundle và thực hiện mã hóa
 export async function encryptWithSignal(senderId, recipientId, recipientBundle, plaintextStr) {
   await initSignal();
   const { address, stored } = await ensureOutboundSession(senderId, recipientId, recipientBundle);
@@ -339,6 +343,7 @@ export async function encryptWithSignal(senderId, recipientId, recipientBundle, 
   };
 }
 
+// Hàm nhận Ciphertext từ socket hoặc REST API, sử dụng session hiện hành để giải mã ra Text gốc
 export async function decryptWithSignal(recipientId, senderId, ciphertextBase64, messageType, senderDeviceId = 1) {
   await initSignal();
   const store = new BrowserSignalProtocolStore(recipientId);

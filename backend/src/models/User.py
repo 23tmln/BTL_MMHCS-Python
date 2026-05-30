@@ -16,6 +16,10 @@ class PyObjectId(ObjectId):
         return ObjectId(v)
 
 class UserBase(BaseModel):
+    """
+    Schema cơ sở cho người dùng (User).
+    Định nghĩa lại các trường thông tin cơ bản nhất.
+    """
     email: EmailStr
     fullName: str
     profilePic: Optional[str] = ''
@@ -24,6 +28,11 @@ class UserCreate(UserBase):
     password: str
 
 class User(UserBase):
+    """
+    Schema đại diện cho người dùng khi lưu trữ và try vấn từ MongoDB.
+    Bao gồm `id` tự động ánh xạ từ `_id` của thư viện Pydantic/BSON,
+    cùng với timestamp (thời gian tạo/cập nhật).
+    """
     id: Optional[PyObjectId] = Field(alias='_id', default=None)
     createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None

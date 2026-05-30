@@ -27,7 +27,7 @@ function ChatContainer() {
     getMessagesByUserId(selectedUser._id);
     subscribeToMessages();
 
-    // clean up
+    // dọn dẹp các listener khi unmount
     return () => unsubscribeFromMessages();
   }, [
     selectedUser,
@@ -78,7 +78,7 @@ function ChatContainer() {
                 </div>
               </div>
             ))}
-            {/* 👇 scroll target */}
+            {/* 👇 mục tiêu cuộn trang hiển thị tin nhắn mới nhất */}
             <div ref={messageEndRef} />
           </div>
         ) : isMessagesLoading ? (

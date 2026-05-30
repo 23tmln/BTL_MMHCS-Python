@@ -4,6 +4,13 @@ from src.lib.db import get_db
 from bson import ObjectId
 
 async def protect_route(request: Request):
+    """
+    Middleware bảo vệ các route (API endpoint) yêu cầu đăng nhập.
+    1. Lấy JWT token từ cookie của request.
+    2. Giải mã và xác thực hợp lệ của token.
+    3. Tìm kiếm người dùng trong database bằng userId (từ token).
+    4. Trả về thông tin người dùng nếu hợp lệ, nếu không throw lỗi Unauthorized/Not Found.
+    """
     try:
         token = request.cookies.get('jwt')
         if not token:

@@ -11,6 +11,14 @@ from src.lib.crypto_client import generate_keys_for_user
 from src.models.User import UserCreate, UserLogin, UserUpdate
 
 async def signup(email: str, fullName: str, password: str):
+    """
+    Xử lý việc đăng ký tài khoản mới cho người dùng.
+    1. Kiểm tra tính hợp lệ của dữ liệu đầu vào (format email, độ dài mật khẩu).
+    2. Kiểm tra xem email đã tồn tại trong cơ sở dữ liệu chưa.
+    3. Băm (hash) mật khẩu bằng thư viện bcrypt để bảo mật.
+    4. Lưu thông tin người dùng cùng mật khẩu đã băm vào collection 'users'.
+    5. Tạo token JWT xác thực, tạo bộ khóa bảo mật (cho Signal Protocol) và gửi email chào đón.
+    """
     try:
         db = get_db()
         if not email or not fullName or (not password):
@@ -45,6 +53,12 @@ async def signup(email: str, fullName: str, password: str):
         return ({'error': 'Internal server error'}, 500)
 
 async def login(email: str, password: str):
+    """
+    Xử lý yêu cầu đăng nhập của người dùng.
+    1. Tìm người dùng dựa trên email cung cấp.
+    2. Xác minh mật khẩu bằng cách so sánh với mật khẩu băm lưu trong database.
+    3. Nếu đúng, tạo JWT token để xác nhận phiên đăng nhập và trả về thông tin người dùng.
+    """
     try:
         db = get_db()
         if not email or not password:
@@ -64,6 +78,11 @@ async def login(email: str, password: str):
         return ({'error': 'Internal server error'}, 500)
 
 async def logout():
+    """
+    Xử lý yêu cầu đăng xuất. 
+    Việc đăng xuất chủ yếu được thực hiện ở client (xóa token khỏi cookie/local storage).
+    API này trả về thông báo thành công cho phía frontend.
+    """
     try:
         return ({'message': 'Logged out successfully'}, 200)
     except Exception as e:
@@ -71,6 +90,11 @@ async def logout():
         return ({'error': 'Internal server error'}, 500)
 
 async def update_profile(user_id: str, fullName: str=None, profilePic: str=None):
+    """
+    Cập nhật hồ sơ (tên, hình đại diện) của người dùng hiện tại.
+    Nếu người dùng có cung cấp ảnh mới (`profilePic`), ảnh đó sẽ được upload lên dịch vụ lưu trữ đám mây (Cloudinary) 
+    và URL của ảnh sẽ được lưu lại vào database.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(user_id):
@@ -96,6 +120,11 @@ async def update_profile(user_id: str, fullName: str=None, profilePic: str=None)
         return ({'error': 'Internal server error'}, 500)
 
 async def check_auth(user_id: str):
+    """
+    Kiểm tra trạng thái đăng nhập và trả về thông tin của người dùng.
+    Thường được gọi khi tải lại trang để duy trì phiên đăng nhập mà không cần bắt người dùng đăng nhập lại,
+    dựa vào token đã được middleware xác thực từ trước.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(user_id):

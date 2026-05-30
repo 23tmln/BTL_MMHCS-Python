@@ -11,6 +11,14 @@ import ChatContainer from "../components/ChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
 import PassphraseModal from "../components/PassphraseModal";
 
+/**
+ * ChatPage.jsx
+ * Trang chính của ứng dụng sau khi đăng nhập thành công.
+ * Sử dụng Zustand Store để lấy trạng thái selectedUser (đối tác đang chat) và danh bạ.
+ * Gồm 2 phần chính:
+ * - Bên Trái: Profile người dùng + Màn chuyển tab (Chats/Contacts) + Danh sách liên hệ
+ * - Bên Phải: Khung chat hiện tại (ChatContainer) hoặc Màn hình chờ (NoConversationPlaceholder)
+ */
 function ChatPage() {
   const { activeTab, selectedUser, getMyChatPartners } = useChatStore();
   const { isSignalConfigured } = useAuthStore();
@@ -25,7 +33,7 @@ function ChatPage() {
     <>
       <div className="relative w-full max-w-6xl h-[800px]">
         <BorderAnimatedContainer>
-          {/* LEFT SIDE */}
+          {/* BÊN TRÁI */}
           <div className="w-80 bg-slate-800/50 backdrop-blur-sm flex flex-col">
             <ProfileHeader />
             <ActiveTabSwitch />
@@ -35,13 +43,13 @@ function ChatPage() {
             </div>
           </div>
 
-          {/* RIGHT SIDE */}
+          {/* BÊN PHẢI */}
           <div className="flex-1 flex flex-col bg-slate-900/50 backdrop-blur-sm">
             {selectedUser ? <ChatContainer /> : <NoConversationPlaceholder />}
           </div>
         </BorderAnimatedContainer>
       </div>
-      {/* Passphrase modal — overlays entire page when E2EE key setup/restore is needed */}
+      {/* Passphrase modal — Modal bao phủ toàn màn hình khi cần thao tác với khóa bảo mật E2EE */}
       <PassphraseModal />
     </>
   );

@@ -2,6 +2,9 @@ from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
 from src.controllers.auth_controller import signup, login, logout, update_profile, check_auth
 from src.middleware.auth_middleware import protect_route
 from src.models.User import UserCreate, UserLogin, UserUpdate
+
+# Router này chịu trách nhiệm định tuyến các API liên quan đến xác thực người dùng:
+# đăng ký, đăng nhập, đăng xuất, cập nhật thông tin và kiểm tra trạng thái đăng nhập.
 router = APIRouter(prefix='/api/auth', tags=['auth'])
 
 @router.post('/signup')

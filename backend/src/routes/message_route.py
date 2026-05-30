@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
 from src.controllers.message_controller import get_all_contacts, get_messages_by_user_id, send_message, get_chat_partners, get_chat_partner_ids
 from src.middleware.auth_middleware import protect_route
+
+# Router này quản lý các API liên quan đến tin nhắn:
+# lấy danh sách người dùng khả dụng, lấy/gửi tin nhắn, lấy lịch sử người đã từng nhắn tin.
+# Tất cả đều yêu cầu token hợp lệ (thông qua middleware protect_route).
 router = APIRouter(prefix='/api/messages', tags=['messages'])
 
 @router.get('/contacts')

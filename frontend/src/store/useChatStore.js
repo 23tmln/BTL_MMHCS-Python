@@ -59,6 +59,8 @@ export const useChatStore = create((set, get) => ({
   },
 
   getMessagesByUserId: async (userId) => {
+    // Tải về lịch sử trò chuyện (các tin nhắn đã bị mã hóa trên server)
+    // Sau đó tiến hành dịch ra plaintext bằng cách giải mã cục bộ bằng các Session Key lưu trong trình duyệt.
     set({ isMessagesLoading: true });
     try {
       const { authUser } = useAuthStore.getState();
@@ -67,12 +69,12 @@ export const useChatStore = create((set, get) => ({
       const ciphertexts = res.data;
       const plaintexts = [];
 
-      // Decrypt messages sequentially to maintain Signal Protocol chain state integrity
+      // Giải mã các tin nhắn một cách tuần tự để giữ tính toàn vẹn của chuỗi trạng thái Signal Protocol
       for (const msg of ciphertexts) {
         try {
           if (msg.senderId === authUser._id) {
-            // Sender cannot decrypt their own ciphertext (Signal is asymmetric).
-            // Check message plaintext cache first — populated when message was sent.
+            // Người gửi không thể giải mã ciphertext của chính họ (Signal là mã hóa bất đối xứng).
+            // Kiểm tra cache văn bản tin nhắn trước — được điền khi tin nhắn được gửi đi.
             const cached = await getCachedMessage(msg._id);
             if (cached) {
               msg.text = cached;
@@ -80,17 +82,17 @@ export const useChatStore = create((set, get) => ({
               msg.text = "[Bạn đã gửi tin nhắn mã hóa]";
             }
           } else if (!msg.ciphertext || !msg.messageType) {
-            // Message has no encrypted data (e.g. image-only or legacy format)
+            // Tin nhắn không có dữ liệu mã hóa (vd: chỉ có ảnh hoặc định dạng cũ)
             msg.text = msg.text || "";
           } else {
-            // Check message cache first (Zalo/WhatsApp model):
-            // If we've successfully decrypted this message before, use the cached plaintext.
-            // This is the key mechanism that allows reading old messages after backup restore.
+            // Kiểm tra bộ nhớ đệm tin nhắn trước (mô hình Zalo/WhatsApp):
+            // Nếu đã giải mã thành công tin nhắn này trước đó, sử dụng văn bản gốc được cache.
+            // Đây là cơ chế chính cho phép đọc tin nhắn cũ sau khi khôi phục bản sao lưu.
             const cached = await getCachedMessage(msg._id);
             if (cached !== undefined && cached !== null) {
               msg.text = cached;
             } else {
-              // Not cached yet — try Signal decryption
+              // Chưa được cache — thử giải mã bằng Signal
               const dec = await decryptWithSignal(
                 authUser._id,
                 msg.senderId,
@@ -98,28 +100,28 @@ export const useChatStore = create((set, get) => ({
                 msg.messageType
               );
               msg.text = dec;
-              // Save to cache so future loads and backup restores can access this plaintext
+              // Lưu vào cache để các lần tải hoặc khôi phục sao lưu sau này có thể truy cập được văn bản gốc này
               await cacheMessage(msg._id, dec);
               useAuthStore.getState().autoBackupKeys();
             }
           }
         } catch (e) {
-          // Classify the error for better UX messaging
+          // Phân loại lỗi để hiển thị thông báo UX tốt hơn
           const errMsg = e?.message || "";
           if (
             errMsg.includes("MessageCounterError") ||
             errMsg.includes("key not found") ||
             errMsg.includes("No record for") ||
             errMsg.includes("No session") ||
-            // "Bad MAC" = ratchet already advanced past this message (forward secrecy).
-            // Happens when the same message is decrypted a second time after a
-            // backup/restore cycle. The key was deleted after the first decryption.
+            // "Bad MAC" = ratchet đã tiếp tục thay đổi khóa vượt qua tin nhắn này (tính bảo mật chuyển tiếp).
+            // Xảy ra khi cùng một tin nhắn được giải mã lần thứ hai sau khi
+            // khôi phục bản sao lưu. Khóa giải mã đã bị xóa sau lần giải mã đầu tiên.
             errMsg.includes("Bad MAC") ||
             errMsg.includes("bad mac") ||
             errMsg.includes("MAC")
           ) {
-            // Old message from a previous session — expected after key regeneration or
-            // after restoring from backup (session already past these messages)
+            // Tin nhắn cũ từ một phiên kết nối trước đó — dự kiến có cảnh báo giả sau khi tạo lại khóa hoặc
+            // sau khi phục hồi từ sao lưu (phiên lưu trữ đã đi qua các tin nhắn này)
             msg.text = "🔒 [Tin nhắn từ phiên cũ - không thể giải mã]";
           } else {
             console.warn("[Chat] Decrypt error for msg", msg._id, errMsg);
@@ -139,6 +141,8 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
+    // Hàm mã hóa tin nhắn gốc (plaintext) trước khi gửi qua API.
+    // Việc mã hóa này xảy ra ở phía Local (Client) bằng khóa chia sẻ (Shared Key) của giao thức.
     const { selectedUser, messages } = get();
     const { authUser } = useAuthStore.getState();
 
@@ -156,11 +160,11 @@ export const useChatStore = create((set, get) => ({
     set({ messages: [...messages, optimisticMessage] });
 
     try {
-      // 1. Fetch recipient's public key bundle
+      // 1. Tải gói khóa công khai (public bundle) của người nhận
       const bundleRes = await axiosInstance.get(`/keys/${selectedUser._id}`);
       const recipientBundle = bundleRes.data;
 
-      // 2. Encrypt message locally
+      // 2. Mã hóa tin nhắn cục bộ
       const { ciphertext, messageType, sessionId } = await encryptWithSignal(
         authUser._id,
         selectedUser._id,
@@ -168,7 +172,7 @@ export const useChatStore = create((set, get) => ({
         messageData.text
       );
 
-      // 3. Send ciphertext to backend
+      // 3. Gửi ciphertext lên backend
       const payload = {
         ciphertext,
         messageType,
@@ -178,15 +182,15 @@ export const useChatStore = create((set, get) => ({
 
       const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, payload);
       
-      // 4. Cache the sent plaintext so we can display it on reload
-      // (Signal is asymmetric — sender can't decrypt their own ciphertext)
+      // 4. Cache văn bản đã gửi đi để ta có thể hiển thị lại khi reload 
+      // (Signal bất đối xứng — người gửi không thể TỰ giải mã ciphertext của chính họ)
       if (res.data._id && messageData.text) {
         await cacheMessage(res.data._id, messageData.text);
         useAuthStore.getState().autoBackupKeys();
       }
 
-      // Update UI: replace optimistic message with the resolved one from server.
-      // E2EE caveat: server returns the ciphertext. So we inject our plaintext over it.
+      // Cập nhật UI: thay thế tin nhắn giả định ban đầu bằng kết quả thực từ server.
+      // Đặc thù E2EE: server chỉ trả về ciphertext. Vậy nên ta phải tự chèn plaintext đè lên đó.
       const resolvedMessage = { ...res.data, text: messageData.text };
 
       const currentMessages = get().messages;
@@ -202,6 +206,8 @@ export const useChatStore = create((set, get) => ({
   },
 
   subscribeToMessages: () => {
+    // Đăng ký Event Lắng nghe tin nhắn phân phối từ Socket
+    // Khi đối phương gửi tin, qua Server chuyển tiếp xuống thì tiến hành giải mã (NẾU hợp lệ).
     const { selectedUser, isSoundEnabled } = get();
     if (!selectedUser) return;
 
@@ -209,7 +215,7 @@ export const useChatStore = create((set, get) => ({
     const authUser = useAuthStore.getState().authUser;
     if (!socket || !authUser) return;
 
-    // Remove any existing listeners to prevent duplicates
+    // Bỏ gắn bất kỳ hàm lắng nghe (listener) socket nào hiện có để ngăn tin nhắn bị lặp lại nhiều lần
     socket.off("newMessage");
 
     socket.on("newMessage", async (newMessage) => {
@@ -219,7 +225,7 @@ export const useChatStore = create((set, get) => ({
         return;
       }
 
-      // Decrypt incoming message
+      // Giải mã tin nhắn vừa nhận được
       try {
         const plainText = await decryptWithSignal(
           authUser._id,
@@ -229,7 +235,7 @@ export const useChatStore = create((set, get) => ({
         );
         newMessage.text = plainText;
 
-        // Cache the decrypted plaintext immediately for future backup restores
+        // Cache (lưu trữ) văn bản plaintext vừa giải mã ngay lập tức nhằm hỗ trợ khôi phục sau này
         if (newMessage._id) {
           await cacheMessage(newMessage._id, plainText);
           useAuthStore.getState().autoBackupKeys();
@@ -242,14 +248,14 @@ export const useChatStore = create((set, get) => ({
           errMsg.includes("key not found") ||
           errMsg.includes("No record for") ||
           errMsg.includes("No session") ||
-          // "Bad MAC" = session state mismatch (ratchet already advanced).
-          // Resolves itself once both sides exchange a fresh PreKey message.
+          // "Bad MAC" = Không khớp state của Session (mã chuyển tiếp ratchet đã khóa bị thay đổi).
+          // Tự động khôi phục bình thường ngay khi 2 bên gửi qua lại một PreKey message mới.
           errMsg.includes("Bad MAC") ||
           errMsg.includes("bad mac") ||
           errMsg.includes("MAC")
         ) {
-          // Session mismatch — the sender is using an old session with us.
-          // This resolves itself once BOTH sides exchange a fresh PreKey message.
+          // Kênh phiên bị lệch — người gửi dùng thông số quá cũ.
+          // Lỗi hiển thị này TỰ MẤT BỎ NGAY LẬP TỨC khi nào hai người chat tương tác gửi lại tin thuộc loại PreKey message.
           newMessage.text = "🔒 [Tin nhắn từ phiên cũ - không thể giải mã]";
         } else {
           newMessage.text = "⚠️ [Giải mã thất bại]";

@@ -5,6 +5,10 @@ from src.lib.cloudinary import upload_image
 from src.lib.socket import get_receiver_socket_id, emit_new_message, emit_online_users
 
 async def get_all_contacts(user_id: str):
+    """
+    Lấy danh sách tất cả người dùng đã đăng ký trong hệ thống (ngoại trừ chính người dùng hiện tại).
+    API này thường được dùng để hiển thị danh sách những người có thể nhắn tin tới.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(user_id):
@@ -18,6 +22,10 @@ async def get_all_contacts(user_id: str):
         return ({'error': 'Server error'}, 500)
 
 async def get_messages_by_user_id(my_id: str, user_to_chat_id: str):
+    """
+    Lấy toàn bộ đoạn chat (lịch sử tin nhắn) giữa người dùng hiện tại (`my_id`) và đối tác cụ thể (`user_to_chat_id`).
+    Sẽ truy vấn database tìm các tin nhắn thể thỏa mãn việc gửi qua lại giữa hai người này.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(my_id) or not ObjectId.is_valid(user_to_chat_id):
@@ -37,6 +45,13 @@ async def get_messages_by_user_id(my_id: str, user_to_chat_id: str):
         return ({'error': 'Internal server error'}, 500)
 
 async def send_message(sender_id: str, receiver_id: str, ciphertext: str=None, message_type: int=None, session_id: str=None, image: str=None):
+    """
+    Xử lý việc gửi một tin nhắn mới.
+    1. Kiểm tra tính hợp lệ của dữ liệu (phải có ciphertext hoặc file/hình ảnh).
+    2. Upload ảnh lên Cloudinary nếu tin nhắn này có đính kèm ảnh gốc.
+    3. Lưu đối tượng tin nhắn vào collection 'messages' trong database.
+    4. Kích hoạt sự kiện Socket.io (emit) báo cho phía nhận (receiver) biết có tin nhắn vừa đến realtime.
+    """
     try:
         print(f'[Message] Relaying message from {sender_id} to {receiver_id}')
         db = get_db()
@@ -72,6 +87,11 @@ async def send_message(sender_id: str, receiver_id: str, ciphertext: str=None, m
         return ({'error': 'Internal server error'}, 500)
 
 async def get_chat_partners(user_id: str):
+    """
+    Lấy danh sách các đối tác (users) đã từng trò chuyện với người dùng hiện tại, 
+    kèm theo thời gian của tin nhắn cuối cùng để hỗ trợ hiển thị danh sách cuộc hội thoại ngoài sidebar
+    sắp xếp mới nhất lên đầu.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(user_id):
@@ -102,6 +122,10 @@ async def get_chat_partners(user_id: str):
         return ({'error': 'Internal server error'}, 500)
 
 async def get_chat_partner_ids(user_id: str):
+    """
+    Chỉ lấy về một danh sách các ID của những đối tác người dùng đã từng chat cùng (không lấy chi tiết Object User).
+    Dùng cho các chức năng kiểm tra quan hệ nhắn tin một cách tối ưu.
+    """
     try:
         db = get_db()
         if not ObjectId.is_valid(user_id):

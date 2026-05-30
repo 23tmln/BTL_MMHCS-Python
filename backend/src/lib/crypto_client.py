@@ -1,6 +1,9 @@
 import httpx
 import os
 from typing import Dict, Any, Optional
+
+# Địa chỉ của microservice độc lập (viết bằng NodeJS) chuyên xử lý logic mã hóa phức tạp của lớp Signal Protocol
+# Thông qua httpx, máy chủ Python sẽ "giao tiếp" với máy chủ NodeJS bằng các HTTP request nội bộ.
 CRYPTO_SERVICE_URL = os.getenv('CRYPTO_SERVICE_URL', 'http://localhost:4000')
 
 async def generate_keys_for_user(user_id: str) -> Dict[str, Any]:

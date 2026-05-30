@@ -2,7 +2,12 @@ import socketio
 import logging
 from typing import Dict, Optional
 logger = logging.getLogger(__name__)
+
+# Khởi tạo máy chủ Socket.IO cho FastApi
+# Được sử dụng để cung cấp khả năng nhắn tin theo thời gian thực (realtime) và cập nhật trạng thái người dùng online.
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins=['*'], ping_timeout=60, ping_interval=25, engineio_logger=False, logger=False)
+
+# Biến toàn cục từ điển ánh xạ giữa: userId (trong db) và socket_id (phiên hiện tại của họ trên socket)
 user_socket_map: Dict[str, str] = {}
 
 def get_receiver_socket_id(user_id: str) -> Optional[str]:

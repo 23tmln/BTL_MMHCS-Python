@@ -13,7 +13,7 @@ import { encryptPrivateBundle, decryptPrivateBundle } from "../lib/cryptoBackup"
 import { clearAllCryptoState } from "../lib/secureStore";
 
 const getSocketUrl = () => {
-  // Always connect to same origin — Vite dev proxy forwards /socket.io to backend
+  // Luôn kết nối cùng nguồn gốc — Vite proxy ở dev sẽ chuyển tiếp /socket.io đến backend
   return window.location.origin;
 };
 
@@ -26,15 +26,15 @@ export const useAuthStore = create((set, get) => ({
   onlineUsers: [],
   isSignalConfigured: false,
 
-  // Passphrase modal state
+  // Trạng thái của modal nhập passphrase
   isPassphraseModalOpen: false,
   passphraseMode: "setup", // "setup" | "restore"
 
-  // --- PASSPHRASE BACKUP / RESTORE ---
+  // --- SAO LƯU / KHÔI PHỤC BẰNG PASSPHRASE (MẬT KHẨU CỤC BỘ) ---
 
   /**
-   * Encrypt the current full private bundle with a passphrase and upload to server.
-   * Called after user creates/updates their passphrase.
+   * Mã hóa toàn bộ dữ liệu private bundle (các khóa ngẫu nhiên) sinh ra tại thiết bị của user
+   * bằng một passphrase do user tự đặt. Sau đó upload gói đã mã hóa này lên server để làm backup.
    */
   backupKeysWithPassphrase: async (passphrase, quiet = false) => {
     const { authUser } = get();
@@ -48,7 +48,7 @@ export const useAuthStore = create((set, get) => ({
         toast.success("🔐 Keys backed up securely!");
         set({ isPassphraseModalOpen: false });
         console.log("[E2EE] Keys backed up with passphrase");
-        // Save passphrase locally for transparent auto-backups on new messages
+        // Lưu passphrase cục bộ để tự động sao lưu ẩn khi có tin nhắn mới
         const { saveKey } = await import("../lib/secureStore");
         await saveKey("auto_backup_passphrase", passphrase);
       }
@@ -67,7 +67,7 @@ export const useAuthStore = create((set, get) => ({
       const { getKey } = await import("../lib/secureStore");
       const passphrase = await getKey("auto_backup_passphrase");
       if (passphrase) {
-        // Run quietly
+        // Chạy ngầm không hiện thông báo
         await get().backupKeysWithPassphrase(passphrase, true);
       }
     } catch (e) {
@@ -76,10 +76,10 @@ export const useAuthStore = create((set, get) => ({
   },
 
   /**
-   * Download encrypted bundle from server and decrypt with passphrase.
-   * Restores all private keys + session state + message cache to IndexedDB.
-   * After restore, automatically reloads the currently open chat so cached
-   * messages appear immediately without user having to navigate away.
+   * Tải gói mã hóa từ server và giải mã bằng passphrase.
+   * Khôi phục tất cả khóa tư + trạng thái session + cache tin nhắn vào IndexedDB.
+   * Sau khi khôi phục, tự động tải lại phiên chat đang mở để các tin nhắn trong cache
+   * hiển thị ngay lập tức mà không cần người dùng phải chuyển trang.
    */
   restoreKeysWithPassphrase: async (passphrase) => {
     const { authUser } = get();
@@ -88,10 +88,10 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.get("/keys/backup/me");
       const { encryptedBundle } = res.data;
       const bundle = await decryptPrivateBundle(encryptedBundle, passphrase);
-      // importFullPrivateBundle now also restores the message plaintext cache
+      // importFullPrivateBundle bây giờ cũng khôi phục cả cache văn bản gốc của tin nhắn
       await importFullPrivateBundle(bundle);
 
-      // Upload public bundle so server has fresh public keys
+      // Tải lên gói công khai để server có public key mới nhất
       const publicBundle = await getPublicBundleForUser(authUser._id);
       await axiosInstance.post("/keys/upload", publicBundle);
 
@@ -99,11 +99,11 @@ export const useAuthStore = create((set, get) => ({
       toast.success("✅ Keys restored! Lịch sử tin nhắn đã được khôi phục.");
       console.log("[E2EE] Keys restored from passphrase backup");
       
-      // Save passphrase locally for transparent auto-backups on new messages
+      // Lưu passphrase cục bộ để tự động sao lưu ẩn khi có tin nhắn mới
       const { saveKey } = await import("../lib/secureStore");
       await saveKey("auto_backup_passphrase", passphrase);
 
-      // Reload the currently open chat so cached messages show up immediately
+      // Tải lại phiên chat đang mở để các tin nhắn trong cache xuất hiện ngay lập tức
       try {
         const { useChatStore } = await import("./useChatStore");
         const { selectedUser, getMessagesByUserId } = useChatStore.getState();
@@ -126,13 +126,13 @@ export const useAuthStore = create((set, get) => ({
   },
 
   /**
-   * Skip restore — generate fresh keys. Old messages will be unreadable.
-   * This does a FULL wipe including message cache (user accepts losing history).
+   * Bỏ qua việc khôi phục — tạo ra các khóa hoàn toàn mới. Tin nhắn cũ sẽ không thể đọc được.
+   * Hành động này sẽ XÓA SẠCH bao gồm cả cache tin nhắn (người dùng tự ý chấp nhận mất lịch sử).
    */
   skipRestoreAndGenerateNewKeys: async () => {
     const { authUser } = get();
     if (!authUser) return;
-    // preserveMessageCache = false → full wipe, user consciously chooses to lose old messages
+    // preserveMessageCache = false → xóa toàn bộ, người dùng có nhận thức chấp nhận mất lịch sử cũ
     await clearAllCryptoState(false);
     const publicBundle = await generateKeysForUser(authUser._id);
     await axiosInstance.post("/keys/upload", publicBundle);
@@ -148,14 +148,16 @@ export const useAuthStore = create((set, get) => ({
     set({ isPassphraseModalOpen: false });
   },
 
-  // --- IDENTITY SETUP ---
+  // --- THIẾT LẬP DANH TÍNH (SIGNAL PROTOCOL) ---
 
   checkLocalIdentity: async (userId) => {
+    // Hàm này chạy ngay sau khi quá trình Auth (đăng nhập/tải lại trang) thành công
+    // Nó kiểm tra xem IndexedDB hiện tại của thiết bị đã có khóa Private/Public của user này chưa.
     try {
       const hasKeys = await hasKeysForUser(userId);
 
       if (hasKeys) {
-        // Keys exist locally — just sync public bundle to server and continue
+        // Các khóa cục bộ đã tồn tại — chỉ cần đồng bộ cập nhật khóa công khai lên server rồi tiếp tục
         console.log("[E2EE] Local keys found. Syncing public bundle...");
         try {
           const publicBundle = await getPublicBundleForUser(userId);
@@ -164,28 +166,27 @@ export const useAuthStore = create((set, get) => ({
           set({ isSignalConfigured: true });
           return;
         } catch (bundleErr) {
-          // This happens when local keys exist but are INCOMPLETE (e.g. missing signature —
-          // keys generated before the signature-save fix was applied).
-          // Treat it the same as "no local keys": check for server backup first.
+          // Xảy ra khi file khóa cục bộ vẫn còn nhưng BỊ KHUYẾT THIẾU (ví dụ thiếu chữ ký).
+          // Coi nó giống như trường hợp "no local keys": kiểm tra backup server để dự phòng.
           console.warn("[E2EE] Local keys incomplete or corrupt:", bundleErr.message,
             "— falling through to backup check.");
-          // Clear broken keys/sessions but PRESERVE message cache so cached
-          // plaintexts survive — user can still read old messages after restore.
+          // Xóa khóa/thất bại phiên nhưng GIỮ LẠI cache văn bản tin nhắn để
+          // người dùng vẫn xem lại được tin cũ nếu hoàn tất restore.
           const { clearAllCryptoState } = await import("../lib/secureStore.js");
           await clearAllCryptoState(true); // preserveMessageCache = true
         }
       }
 
-      // No local keys (or they were just cleared) — check if server has an encrypted backup
+      // Chưa có key local (hoặc vừa bị xóa) — kiểm tra trên server có bản lưu mật nào không
       console.log("[E2EE] No valid local keys. Checking server for encrypted backup...");
       try {
         await axiosInstance.get("/keys/backup/me");
-        // Backup exists → prompt user to restore with passphrase
+        // Backup tồn tại → yêu cầu người dùng khôi phục bằng passphrase
         console.log("[E2EE] Backup found on server. Prompting restore...");
         set({ isPassphraseModalOpen: true, passphraseMode: "restore" });
       } catch (e) {
         if (e.response?.status === 404) {
-          // No backup either — fresh start, generate new keys
+          // Không tìm thấy bản lưu cấu hình nào — Sinh key mới tinh hoàn toàn
           console.log("[E2EE] No backup found. Generating fresh keys...");
           const publicBundle = await generateKeysForUser(userId);
           await axiosInstance.post("/keys/upload", publicBundle);
@@ -241,7 +242,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post("/auth/login", data);
 
-      // If logging in as a different user on this device, clear previous user's keys
+      // Nếu người đăng nhập là một tài khoản khác hoàn toàn trên cùng máy này, xóa IndexedDB của người trước
       if (get().authUser && get().authUser._id !== res.data._id) {
         await clearAllCryptoState();
       }
@@ -268,10 +269,10 @@ export const useAuthStore = create((set, get) => ({
       toast.success("Logged out successfully");
       get().disconnectSocket();
 
-      // NOTE: We intentionally do NOT clear IndexedDB on logout.
-      // Keys persist in the browser so the same user can log back in without re-entering passphrase.
-      // IndexedDB is only cleared when switching accounts or when user explicitly chooses "Generate new keys".
-
+      // LƯU Ý: Về có ý đồ, chúng tôi KHÔNG xóa IndexedDB khi thao tác Logout.
+      // Do đó Key vẫn được lưu trong Web để lần tới chính tài khoản tự login lại k bị bắt gõ passphrase.
+      // Việc Xóa IndexedDB chỉ kích hoạt ngay khi login bằng một tải khoản khác hoặc khi họ chọn "Bỏ qua & tạo khóa mới"
+      
       try {
         const { useChatStore } = await import("./useChatStore");
         useChatStore.getState().clearChat();

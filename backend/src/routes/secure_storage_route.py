@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from src.middleware.auth_middleware import protect_route
 from src.controllers.secure_storage_controller import setup_secure_storage, backup_secure_storage, restore_secure_storage, status_secure_storage
+
+# Router này kết nối các HTTP Endpoint với Controller quản lý sao lưu an toàn (Secure Storage).
+# Nó trực tiếp gọi xuống các hàm xử lý logic của `secure_storage_controller`.
 router = APIRouter(prefix='/api/secure-storage', tags=['secure_storage'])
 
 @router.post('/setup')

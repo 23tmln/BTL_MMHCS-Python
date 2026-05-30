@@ -2,6 +2,10 @@ from src.lib.resend import resend_client, sender
 from src.emails.email_templates import create_welcome_email_template
 
 async def send_welcome_email(email: str, name: str, client_url: str) -> bool:
+    """
+    Hàm gửi email chào mừng (Welcome Email) khi người dùng mới đăng ký thành công.
+    Dùng resend_client (dịch vụ Resend) kết hợp với HTML template tùy biến (từ email_templates.py).
+    """
     try:
         html_content = create_welcome_email_template(name, client_url)
         response = await resend_client.send_email(from_email=f"{sender['name']} <{sender['email']}>", to_email=email, subject='Welcome to Chatify!', html=html_content)

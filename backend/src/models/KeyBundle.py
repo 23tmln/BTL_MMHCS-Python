@@ -15,6 +15,11 @@ class PyObjectId(ObjectId):
         return ObjectId(v)
 
 class KeyBundle(BaseModel):
+    """
+    Schema đại diện cho Bộ Khóa (Key Bundle - dùng trong giao thức Signal).
+    Chứa thông tin userId và `bundle` bao gồm các public key (Identity Key, Signed PreKey, One-Time PreKeys)
+    được lưu trữ trên server để trung chuyển cho người khác muốn bắt đầu chat với user này.
+    """
     id: Optional[PyObjectId] = Field(alias='_id', default=None)
     userId: str
     bundle: Dict[str, Any]

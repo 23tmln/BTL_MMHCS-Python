@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from src.middleware.auth_middleware import protect_route
 from src.lib.db import get_db
+
+# Router này quản lý các endpoint liên quan đến Key Bundle (Bó khóa công khai) của Signal Protocol.
+# Cho phép user upload public bundle (để người khác có thể thiết lập phiên nhắn tin với họ),
+# tải lên/truy xuất encrypted backup của bundle và lấy bundle của một người cụ thể.
 router = APIRouter(prefix='/api/keys', tags=['keys'])
 
 @router.post('/upload')

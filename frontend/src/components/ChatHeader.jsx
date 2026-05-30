@@ -15,7 +15,7 @@ function ChatHeader() {
 
     window.addEventListener("keydown", handleEscKey);
 
-    // cleanup function
+    // hàm dọn dẹp biến gắn khi hủy component (unmount)
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [setSelectedUser]);
 
