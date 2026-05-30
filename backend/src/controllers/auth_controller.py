@@ -52,27 +52,69 @@ async def signup(email: str, fullName: str, password: str):
         print(f'Error in signup controller: {e}')
         return ({'error': 'Internal server error'}, 500)
 
-async def login(email: str, password: str):
-    """
-    Xử lý yêu cầu đăng nhập của người dùng.
-    1. Tìm người dùng dựa trên email cung cấp.
-    2. Xác minh mật khẩu bằng cách so sánh với mật khẩu băm lưu trong database.
-    3. Nếu đúng, tạo JWT token để xác nhận phiên đăng nhập và trả về thông tin người dùng.
-    """
+async def login(email: str, password: str = None):
+    """Handle user login"""
     try:
         db = get_db()
-        if not email or not password:
-            return ({'error': 'Email and password are required'}, 400)
-        user = await db['users'].find_one({'email': email})
+
+        # Validation
+        if not email:
+            return {"error": "Email is required"}, 400
+
+        # Passwordless login is used only after the desktop app has completed
+        # local passkey + TOTP verification. Only passkey-registered user docs
+        # are eligible for this path.
+        if password is None or password == "":
+            user = await db["users"].find_one({
+                "$and": [
+                    {
+                        "$or": [
+                            {"email": email},
+                            {"fullName": email},
+                            {"email": f"{email}@gmail.com"},
+                        ]
+                    },
+                    {
+                        "$or": [
+                            {"credential_data": {"$exists": True}},
+                            {"credentials": {"$exists": True, "$ne": []}},
+                        ]
+                    },
+                ]
+            })
+
+            if not user:
+                return {"error": "Passkey credentials are required"}, 400
+        else:
+            # Find user by email
+            user = await db["users"].find_one({"email": email})
+            if not user:
+                return {"error": "Invalid credentials"}, 400
+
+            stored_password = user.get("password")
+            if not stored_password:
+                return {"error": "Password login is not available for this account"}, 400
+
+            # Verify password
+            is_password_valid = bcrypt.checkpw(
+                password.encode("utf-8"),
+                stored_password
+            )
+
+            if not is_password_valid:
+                return {"error": "Invalid credentials"}, 400
+
         if not user:
-            return ({'error': 'Invalid credentials'}, 400)
-        is_password_valid = bcrypt.checkpw(password.encode('utf-8'), user['password'])
-        if not is_password_valid:
-            return ({'error': 'Invalid credentials'}, 400)
-        token = generate_token(str(user['_id']))
-        user.pop('password', None)
-        user['_id'] = str(user['_id'])
-        return (user, 200, token)
+            return {"error": "Invalid credentials"}, 400
+
+        # Generate token
+        token = generate_token(str(user["_id"]))
+
+        # Remove password from response
+        user.pop("password", None)
+        user["_id"] = str(user["_id"])
+
+        return user, 200, token
     except Exception as e:
         print(f'Error in login controller: {e}')
         return ({'error': 'Internal server error'}, 500)

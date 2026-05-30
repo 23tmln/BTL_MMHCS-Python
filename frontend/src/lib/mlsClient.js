@@ -8,16 +8,42 @@ import {
 } from "ts-mls";
 import { getMlsGroupState, getMlsIdentity, saveMlsGroupState, saveMlsIdentity } from "./mlsStore.js";
 
-export const MLS_CIPHER_SUITE = "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519";
+export const MLS_CIPHER_SUITE = "MLS_128_DHKEMP256_AES128GCM_SHA256_P256";
 
 async function getMlsContext() {
   const cipherSuite = await getCiphersuiteImpl(getCiphersuiteFromName(MLS_CIPHER_SUITE));
   return { cipherSuite };
 }
 
+function normalizeStoredMlsIdentity(identity) {
+  if (!identity?.privateMaterial) return null;
+
+  const credential = identity.credentialPayload?.credential ?? identity.credential;
+  const publicKey = identity.credentialPayload?.publicKey ?? credential;
+  const keyPackage = identity.keyPackagePayload?.keyPackage ?? identity.keyPackage;
+  const keyPackageRef = identity.keyPackagePayload?.keyPackageRef ?? identity.keyPackageRef;
+
+  if (!credential || !keyPackage || !keyPackageRef) return null;
+
+  return {
+    ...identity,
+    credentialPayload: {
+      credential,
+      publicKey,
+      cipherSuite: identity.credentialPayload?.cipherSuite ?? MLS_CIPHER_SUITE,
+    },
+    keyPackagePayload: {
+      keyPackage,
+      keyPackageRef,
+      cipherSuite: identity.keyPackagePayload?.cipherSuite ?? MLS_CIPHER_SUITE,
+    },
+  };
+}
+
 export async function ensureMlsIdentity(userId) {
-  const existing = await getMlsIdentity(userId);
-  if (existing?.credentialPayload && existing?.keyPackagePayload) {
+  const existing = normalizeStoredMlsIdentity(await getMlsIdentity(userId));
+  if (existing) {
+    await saveMlsIdentity(userId, existing);
     return existing;
   }
 

@@ -54,7 +54,7 @@ class UserResponse(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: Optional[str] = None
 
 class UserUpdate(BaseModel):
     fullName: Optional[str] = None
