@@ -1,17 +1,16 @@
 import { PlusIcon, UsersIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import CreateGroupModal from "./CreateGroupModal";
 import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 
 function GroupsList() {
-  const { groups, getMyGroups, ensureMlsReady, isUsersLoading, setSelectedGroup } = useChatStore();
-  const { isSignalConfigured } = useAuthStore();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { groups, getMyGroups, ensureMlsReady, isUsersLoading, isCreateGroupOpen, setCreateGroupOpen, setSelectedGroup } = useChatStore();
+  const { authUser } = useAuthStore();
 
   useEffect(() => {
-    if (!isSignalConfigured) return;
+    if (!authUser) return;
 
     async function loadGroups() {
       await ensureMlsReady();
@@ -19,15 +18,15 @@ function GroupsList() {
     }
 
     loadGroups();
-  }, [ensureMlsReady, getMyGroups, isSignalConfigured]);
+  }, [authUser, ensureMlsReady, getMyGroups]);
 
-  if (isUsersLoading) return <UsersLoadingSkeleton />;
+  if (isUsersLoading && !isCreateGroupOpen) return <UsersLoadingSkeleton />;
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setIsCreateOpen(true)}
+        onClick={() => setCreateGroupOpen(true)}
         className="w-full bg-cyan-500/20 text-cyan-300 rounded-lg px-4 py-3 flex items-center justify-center gap-2 hover:bg-cyan-500/30 transition-colors"
       >
         <PlusIcon className="w-4 h-4" />
@@ -56,7 +55,7 @@ function GroupsList() {
         ))
       )}
 
-      {isCreateOpen && <CreateGroupModal onClose={() => setIsCreateOpen(false)} />}
+      {isCreateGroupOpen && <CreateGroupModal onClose={() => setCreateGroupOpen(false)} />}
     </>
   );
 }

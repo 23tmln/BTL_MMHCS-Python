@@ -33,17 +33,17 @@ describe("mlsStore", () => {
   });
 
   it("stores MLS group state by group id", async () => {
-    await saveMlsGroupState("group-1", { epoch: 3, state: "serialized" });
+    await saveMlsGroupState("group-1", { epoch: 3, state: "serialized" }, "user-1");
 
-    await expect(getMlsGroupState("group-1")).resolves.toEqual({
+    await expect(getMlsGroupState("group-1", "user-1")).resolves.toEqual({
       epoch: 3,
       state: "serialized",
     });
   });
 
   it("stores pending Welcome by group id", async () => {
-    await saveMlsPendingWelcome("group-1", { welcome: "abc" });
+    await saveMlsPendingWelcome("group-1", { welcome: "abc" }, "user-1");
 
-    await expect(getMlsPendingWelcome("group-1")).resolves.toEqual({ welcome: "abc" });
+    await expect(getMlsPendingWelcome("group-1", "user-1")).resolves.toEqual({ welcome: "abc" });
   });
 });

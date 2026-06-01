@@ -4,6 +4,8 @@ from src.controllers.group_controller import (
     create_group,
     get_available_mls_key_packages,
     get_group_messages,
+    get_group_mls_handshakes,
+    release_reserved_mls_key_packages,
     get_my_groups,
     leave_group,
     remove_group_member,
@@ -66,6 +68,16 @@ async def get_available_mls_key_packages_route(request: Request, response: Respo
     return result
 
 
+@router.post('/mls/key-packages/release')
+async def release_reserved_mls_key_packages_route(request: Request, response: Response, user=Depends(protect_route)):
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
+    data = await request.json()
+    result, status_code = await release_reserved_mls_key_packages(str(user.get('_id')), data.get('keyPackageIds', []))
+    response.status_code = status_code
+    return result
+
+
 @router.get('/{group_id}/messages')
 async def get_group_messages_route(group_id: str, response: Response, user=Depends(protect_route)):
     if not user:
@@ -81,6 +93,15 @@ async def send_group_message_route(group_id: str, request: Request, response: Re
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
     data = await request.json()
     result, status_code = await send_group_message(str(user.get('_id')), group_id, data.get('text'), data.get('image'), data.get('ciphertext'), data.get('mlsEpoch'))
+    response.status_code = status_code
+    return result
+
+
+@router.get('/{group_id}/mls/handshakes')
+async def get_group_mls_handshakes_route(group_id: str, response: Response, user=Depends(protect_route)):
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
+    result, status_code = await get_group_mls_handshakes(str(user.get('_id')), group_id)
     response.status_code = status_code
     return result
 

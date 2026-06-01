@@ -22,7 +22,7 @@ function CreateGroupModal({ onClose }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || memberIds.length === 0) return;
 
     setIsSubmitting(true);
     try {
@@ -71,7 +71,7 @@ function CreateGroupModal({ onClose }) {
 
           <button
             type="submit"
-            disabled={!name.trim() || isSubmitting}
+            disabled={!name.trim() || memberIds.length === 0 || isSubmitting}
             className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg py-2 font-medium"
           >
             {isSubmitting ? "Creating..." : "Create group"}
